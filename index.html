@@ -52,6 +52,10 @@
 
   main{display:flex; gap:16px; padding:16px 28px 32px; align-items:flex-start; max-width:1640px; margin:0 auto}
   aside{width:300px; flex-shrink:0; display:flex; flex-direction:column; gap:14px; position:sticky; top:16px}
+  .content{flex:1; min-width:0; display:flex; flex-direction:column; gap:16px}   /* 보드 + 달력을 한 열로 → 달력이 보드 바로 아래 */
+  .dayset{font-size:12px; color:var(--sub); display:flex; align-items:center; gap:6px}
+  .dayset input{border:1px solid var(--line); border-radius:var(--r3); padding:5px 7px; font-size:12px; background:var(--card); font-family:inherit}
+  .dayset input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash)}
   .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:18px; box-shadow:var(--shadow)}
 
   /* AI */
@@ -109,7 +113,7 @@
   .day.collapsed .dayHead{margin-bottom:0}
 
   /* 일정 달력 — design.md(Cal.com) 참고: 흰 캔버스·헤어라인·8/12px 라운드·모노톤 */
-  #schedule{max-width:1640px; margin:0 auto; padding:6px 28px 40px}
+  #schedule{padding:2px 0 8px}   /* .content 안에 있으므로 자체 여백 최소화 */
   .schedHead{display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap}
   .schedNav{display:flex; align-items:center; gap:6px}
   .schedNav button{border:1px solid var(--line); background:var(--card); border-radius:var(--r3); padding:6px 12px; font-size:13px}
@@ -180,7 +184,8 @@
     #tlPanel{padding:14px 16px 0}
     main{flex-direction:column; padding:12px 16px 24px; align-items:stretch}  /* stretch: 보드·사이드바 폭 동일 */
     aside{width:100%; position:static}
-    .board{order:-1; grid-template-columns:1fr; overflow:visible; gap:10px; width:100%}  /* 보드를 맨 위로, 7일 세로 스택 */
+    .content{order:-1; width:100%}                      /* 보드+달력을 사이드바 위로 */
+    .board{grid-template-columns:1fr; overflow:visible; gap:10px; width:100%}  /* 7일 세로 스택 */
     .day.today{order:-1}                                /* 요일과 무관하게 오늘을 최상단으로 */
     .day{min-height:auto}
     .track,.tlHours{height:112px}
@@ -189,7 +194,7 @@
     .day:not(.collapsed) .dayHead{margin-bottom:12px}
     .dayHead .chev{display:inline-block; transition:transform .15s}
     .day.collapsed .dayHead .chev{transform:rotate(-90deg)}
-    #schedule{padding:6px 16px 28px}
+    #schedule{padding:2px 0 16px}
     .schedAdd{width:100%; margin-left:0}
     .schedAdd input[type=text]{flex:1; width:auto; min-width:0}
     .scCell{min-height:64px; padding:4px}
@@ -220,6 +225,7 @@
 <section id="tlPanel">
   <div class="eyebrow">이번 주 집중 기록</div>
   <div id="tlLegend"></div>
+  <div class="dayset" title="타임라인·오늘 기준이 되는 하루의 시작/끝 시간 (예: 09:00 ~ 02:00 은 다음날 새벽 2시까지)">하루 <input type="time" id="dayStart"> ~ <input type="time" id="dayEnd"></div>
 </section>
 
 <main>
@@ -255,10 +261,9 @@
       <textarea id="notes" placeholder="자유롭게 메모하세요. 자동 저장됩니다."></textarea>
     </div>
   </aside>
+  <div class="content">
   <section class="board" id="board"></section>
-</main>
-
-<section id="schedule">
+  <section id="schedule">
   <div class="eyebrow">📅 일정 달력</div>
   <div class="schedHead">
     <div class="schedNav">
@@ -275,7 +280,9 @@
     </div>
   </div>
   <div id="schedGrid"></div>
-</section>
+  </section>
+  </div>
+</main>
 
 <script src="app.js"></script>
 </body>

@@ -4,7 +4,7 @@
 // ---------- state ----------
 const LS = 'myday-v1';
 const state = Object.assign(
-  { tasks: [], events: [], notes: '', apiKey: '', pomoDone: 0, sessions: [], updatedAt: 0, gistToken: '', gistId: '', workMin: 25, breakMin: 5 },
+  { tasks: [], events: [], notes: '', apiKey: '', pomoDone: 0, sessions: [], updatedAt: 0, gistToken: '', gistId: '', workMin: 25, breakMin: 5, dayStart: '00:00', dayEnd: '00:00' },
   JSON.parse(localStorage.getItem(LS) || '{}')
 );
 const save = () => { state.updatedAt = Date.now(); localStorage.setItem(LS, JSON.stringify(state)); schedulePush(); };
@@ -12,10 +12,33 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 // ---------- dates ----------
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const today = () => ymd(new Date());
+const today = () => ymd(new Date());   // 달력상 오늘(월 달력·미니달력용)
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const monday = d => addDays(d, -((d.getDay() + 6) % 7));
 const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
+
+// ---------- 논리적 하루 (하루 시작~끝 시간 기준, 자정 넘김 지원) ----------
+const timeMin = d => d.getHours() * 60 + d.getMinutes();
+const hm2min = s => { const [h, m] = (s || '00:00').split(':').map(Number); return h * 60 + m; };
+function dayBounds() {
+  const start = hm2min(state.dayStart), end = hm2min(state.dayEnd);
+  const crosses = end <= start;                       // 끝<=시작 이면 자정을 넘김(예: 09:00~02:00, 기본 00:00~00:00=24h)
+  const len = (crosses ? 1440 - start + end : end - start) || 1440;
+  return { start, end, crosses, len };
+}
+// 어떤 시각이 속한 '논리적 날짜' — 자정 넘김 하루면 끝 시간 전까지는 전날로 귀속
+function logicalDate(t) {
+  const b = dayBounds(), d = new Date(t);
+  if (b.crosses && timeMin(d) < b.end) return ymd(addDays(d, -1));
+  return ymd(d);
+}
+const logicalToday = () => logicalDate(new Date());
+// 시각(타임스탬프)의 트랙 내 위치 비율(0~1) — 하루 시작 기준 경과분 / 하루 길이
+function dayPosFrac(t) {
+  const b = dayBounds();
+  const off = ((timeMin(new Date(t)) - b.start) % 1440 + 1440) % 1440;
+  return Math.min(1, Math.max(0, off / b.len));
+}
 
 let weekStart = monday(new Date());
 let calBase = new Date(); calBase.setDate(1);
@@ -45,7 +68,7 @@ const isMobile = () => window.innerWidth <= 900;
 let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(renderBoard, 200); });
 
 function renderBoard() {
-  const t = today();
+  const t = logicalToday();   // 하루 시작/끝 기준 '오늘'
   document.getElementById('weekRange').textContent =
     `${weekStart.getMonth() + 1}.${weekStart.getDate()} ~ ${addDays(weekStart, 6).getMonth() + 1}.${addDays(weekStart, 6).getDate()}`;
   board.innerHTML = '';
@@ -85,23 +108,29 @@ function renderBoard() {
 // dataviz 검증 팔레트 (고정 순서 배정, 순환 금지 — 9번째 작업부터는 회색)
 const PALETTE = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834'];
 function renderTimeline() {
+  const b = dayBounds();
   const weekDates = [...Array(7)].map((_, i) => ymd(addDays(weekStart, i)));
+  // 세션은 '논리적 날짜'로 귀속 (자정 넘김 하루면 끝 시간 전 새벽은 전날로)
   const ses = state.sessions
-    .filter(s => weekDates.includes(ymd(new Date(s.start))))
+    .filter(s => weekDates.includes(logicalDate(s.start)))
     .sort((a, b) => a.start - b.start);
   const order = [];
   ses.forEach(s => { if (!order.includes(s.title)) order.push(s.title); });
   const colorOf = i => i < PALETTE.length ? PALETTE[i] : '#898781';
   const hhmm = ms => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  // 하루 시작/중간/끝 라벨
+  const lbl = min => `${Math.floor(((min % 1440) + 1440) % 1440 / 60)}시`;
+  const hoursHtml = `<span>${lbl(b.start)}</span><span>${lbl(b.start + b.len / 2)}</span><span>${b.len >= 1440 ? '24시' : lbl(b.start + b.len)}</span>`;
+  document.querySelectorAll('.tlHours').forEach(h => h.innerHTML = hoursHtml);
   document.querySelectorAll('.track[data-date]').forEach(track => {
-    const daySes = ses.filter(s => ymd(new Date(s.start)) === track.dataset.date);
+    const daySes = ses.filter(s => logicalDate(s.start) === track.dataset.date);
     let html = '';
-    for (let h = 6; h < 24; h += 6) html += `<div class="htick" style="top:${h / 24 * 100}%"></div>`;
+    for (const p of [25, 50, 75]) html += `<div class="htick" style="top:${p}%"></div>`;
     daySes.forEach(s => {
-      const d = new Date(s.start);
-      const startMin = d.getHours() * 60 + d.getMinutes();
-      // ponytail: 25분은 24h 트랙에서 1.7%라 너무 얇음 — 최소 2.5% 보정(시각 판독용, 툴팁이 정확한 시간)
-      html += `<div class="hseg" style="top:${startMin / 1440 * 100}%;height:${Math.max(s.min / 1440 * 100, 2.5)}%;background:${colorOf(order.indexOf(s.title))}" title="${hhmm(s.start)}~${hhmm(s.start + s.min * 60000)} ${esc(s.title)}"></div>`;
+      // ponytail: 짧은 구간은 얇으니 최소 2.5% 보정(정확한 시간은 툴팁)
+      const top = dayPosFrac(s.start) * 100;
+      const hgt = Math.max(s.min / b.len * 100, 2.5);
+      html += `<div class="hseg" style="top:${top}%;height:${Math.min(hgt, 100 - top)}%;background:${colorOf(order.indexOf(s.title))}" title="${hhmm(s.start)}~${hhmm(s.start + s.min * 60000)} ${esc(s.title)}"></div>`;
     });
     track.innerHTML = html;
     const cnt = document.querySelector(`.tlCount[data-count="${track.dataset.date}"]`);
@@ -129,7 +158,7 @@ function cardEl(task) {
   const marks = [];
   if (task.carried) marks.push('<span class="mk" title="다음날로 이월됨">↪</span>');
   if (task.pomos) marks.push(`<span class="mk" title="완료한 포모도로">🍅${task.pomos}</span>`);
-  const focusBtn = task.status !== 'done' && task.status !== 'skipped' && task.date === today()
+  const focusBtn = task.status !== 'done' && task.status !== 'skipped' && task.date === logicalToday()
     ? `<button data-act="focus" title="이 할 일로 포모도로 시작">🍅</button>` : '';
   const actBtns = ACTS.map(([a, ic, t]) => {
     const active = (a === 'delay' ? 'delayed' : a) === task.status;
@@ -354,11 +383,19 @@ function applyPomoSettings() {
 }
 document.getElementById('workMin').addEventListener('change', applyPomoSettings);
 document.getElementById('breakMin').addEventListener('change', applyPomoSettings);
+// 하루 시작/끝 시간 설정 → 타임라인·오늘 기준 갱신
+function applyDaySettings() {
+  state.dayStart = document.getElementById('dayStart').value || '00:00';
+  state.dayEnd = document.getElementById('dayEnd').value || '00:00';
+  save(); renderBoard();
+}
+document.getElementById('dayStart').addEventListener('change', applyDaySettings);
+document.getElementById('dayEnd').addEventListener('change', applyDaySettings);
 function renderPomoTasks() {
   const sel = document.getElementById('pomoTask');
   const cur = sel.value;
   sel.innerHTML = '<option value="">집중할 오늘 할 일 선택 (선택)</option>' +
-    state.tasks.filter(x => x.date === today() && x.status === 'todo')
+    state.tasks.filter(x => x.date === logicalToday() && x.status === 'todo')
       .map(x => `<option value="${x.id}">${esc(x.title)}</option>`).join('');
   sel.value = cur;
 }
@@ -436,7 +473,7 @@ document.getElementById('aiBtn').onclick = async () => {
 
 // ---------- 동기화 (GitHub Gist) ----------
 // ponytail: last-write-wins 전체 덮어쓰기 — 1인용이라 충돌 병합은 필요해지면 추가
-const SYNC_KEYS = ['tasks', 'events', 'notes', 'pomoDone', 'sessions', 'updatedAt', 'workMin', 'breakMin']; // API 키·토큰은 기기별 보관(동기화 제외)
+const SYNC_KEYS = ['tasks', 'events', 'notes', 'pomoDone', 'sessions', 'updatedAt', 'workMin', 'breakMin', 'dayStart', 'dayEnd']; // API 키·토큰은 기기별 보관(동기화 제외)
 const ghHeaders = () => ({ 'Authorization': 'Bearer ' + state.gistToken, 'Accept': 'application/vnd.github+json' });
 let pushT = null;
 function schedulePush() {
@@ -521,8 +558,10 @@ function runSelfTest() {
 // ---------- init ----------
 document.getElementById('workMin').value = state.workMin || 25;
 document.getElementById('breakMin').value = state.breakMin || 5;
+document.getElementById('dayStart').value = state.dayStart || '00:00';
+document.getElementById('dayEnd').value = state.dayEnd || '00:00';
 document.getElementById('schedDate').value = today();
-if (rolloverTasks(state.tasks, today())) save();
+if (rolloverTasks(state.tasks, logicalToday())) save();
 pomoRender();
 renderBoard();
 syncPull();
