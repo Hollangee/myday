@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>나의 하루 — 개인 생산성</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f1f3;       /* 부드러운 웜 로즈그레이 배경 */
+    --card:#ffffff;
+    --ink:#241a1f;
+    --sub:#7a6a71;
+    --line:#ece4e8;
+    --line-2:#f4eef1;
+    --accent:#b76b88;      /* 더스티 로즈 */
+    --accent-ink:#9e5474;  /* 솔리드 버튼 */
+    --accent-deep:#854560; /* 버튼 hover */
+    --accent-wash:#f7edf1;
+    --done:#16a34a; --delay:#f59e0b; --skip:#9ca3af; --doing:#0d9488;
+    --serif:'Noto Serif KR',Georgia,'Malgun Gothic',serif;
+    --r:12px; --r2:8px; --r3:6px;   /* 각진 모던 라운드 */
+    --shadow:0 1px 2px rgba(17,21,29,.04), 0 4px 16px rgba(17,21,29,.04);
+  }
+  *{box-sizing:border-box; margin:0}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased}
+  button{cursor:pointer; font-family:inherit; color:inherit}
+
+  /* Header */
+  header{display:flex; align-items:center; gap:18px; padding:18px 28px; flex-wrap:wrap; max-width:1640px; margin:0 auto; border-bottom:1px solid var(--line)}
+  header h1{font-family:var(--serif); font-weight:700; font-size:24px; letter-spacing:-0.02em}
+  header h1 .dot{color:var(--accent)}
+  .weeknav{display:flex; align-items:center; gap:4px}
+  .weeknav button{border:1px solid var(--line); background:var(--card); border-radius:var(--r3); padding:6px 10px; font-size:13px; line-height:1}
+  .weeknav button:hover{border-color:var(--accent); color:var(--accent)}
+  .weeknav #todayW{padding:6px 12px}
+  .weeknav .range{font-weight:600; font-size:14px; min-width:120px; text-align:center; font-variant-numeric:tabular-nums}
+  .legend{margin-left:auto; display:flex; gap:13px; font-size:12px; color:var(--sub); align-items:center; flex-wrap:wrap}
+  .legend i{display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:middle}
+  #keyBtn,#syncBtn{border:1px solid var(--line); background:var(--card); border-radius:var(--r3); padding:6px 12px; font-size:13px}
+  #keyBtn:hover,#syncBtn:hover{border-color:var(--accent); color:var(--accent)}
+
+  .eyebrow{font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--sub); margin-bottom:12px}
+
+  /* Weekly focus legend strip */
+  #tlPanel{display:flex; align-items:center; gap:16px; padding:16px 28px 0; flex-wrap:wrap; max-width:1640px; margin:0 auto}
+  #tlPanel .eyebrow{margin:0}
+  #tlLegend{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--sub)}
+  #tlLegend i{width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:5px}
+  #tlEmpty{color:var(--sub)}
+
+  main{display:flex; gap:16px; padding:16px 28px 32px; align-items:flex-start; max-width:1640px; margin:0 auto}
+  aside{width:300px; flex-shrink:0; display:flex; flex-direction:column; gap:14px; position:sticky; top:16px}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:18px; box-shadow:var(--shadow)}
+
+  /* AI */
+  #goalInput{width:100%; border:1px solid var(--line); border-radius:var(--r2); padding:10px; font-size:14px; resize:vertical; min-height:66px; font-family:inherit; background:var(--card)}
+  #goalInput:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash)}
+  #aiBtn{width:100%; margin-top:10px; background:var(--accent-ink); color:#fff; border:none; border-radius:var(--r2); padding:11px; font-size:14px; font-weight:600}
+  #aiBtn:hover{background:var(--accent-deep)}
+  #aiBtn:disabled{opacity:.5}
+  #aiMsg{font-size:12px; color:var(--sub); margin-top:8px; min-height:15px}
+
+  /* Pomodoro */
+  #pomoTime{font-family:var(--serif); font-size:48px; font-weight:700; text-align:center; font-variant-numeric:tabular-nums; letter-spacing:0.01em; line-height:1.1}
+  #pomoMode{text-align:center; font-size:12px; color:var(--sub); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.06em; font-weight:600}
+  .pomoBtns{display:flex; gap:8px; justify-content:center; margin-top:12px}
+  .pomoBtns button{border:1px solid var(--line); background:var(--card); border-radius:var(--r2); padding:8px 20px; font-size:13px; font-weight:500}
+  .pomoBtns button:hover{border-color:var(--accent); color:var(--accent)}
+  #pomoStart{background:var(--accent-ink); border-color:var(--accent-ink); color:#fff}
+  #pomoStart:hover{background:var(--accent-deep); color:#fff}
+  #pomoTask{width:100%; margin-top:14px; border:1px solid var(--line); border-radius:var(--r2); padding:9px; font-size:13px; background:var(--card)}
+  #pomoCount{text-align:center; font-size:12px; color:var(--sub); margin-top:10px}
+
+  /* Calendar */
+  #cal table{width:100%; border-collapse:collapse; font-size:12px; text-align:center}
+  #cal th{color:var(--sub); font-weight:600; padding:4px 0}
+  #cal td{padding:6px 0; cursor:pointer; border-radius:var(--r3); position:relative}
+  #cal td:hover{background:var(--paper)}
+  #cal td.other{color:#c2c9d4}
+  #cal td.today{background:var(--accent); color:#fff; font-weight:700}
+  #cal td .dot{position:absolute; bottom:2px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--delay)}
+  .calHead{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+  .calHead button{border:none; background:none; font-size:13px; padding:2px 8px; color:var(--sub)}
+  .calHead button:hover{color:var(--accent)}
+  .calHead .eyebrow{margin:0}
+
+  #notes{width:100%; min-height:130px; border:1px solid var(--line); border-radius:var(--r2); padding:10px; font-size:13px; resize:vertical; font-family:inherit; background:var(--card)}
+  #notes:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash)}
+
+  /* Board */
+  .board{flex:1; display:grid; grid-template-columns:repeat(7,minmax(150px,1fr)); gap:12px; overflow-x:auto}
+  .day{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:12px; min-height:320px; display:flex; flex-direction:column; overflow:hidden; box-shadow:var(--shadow)}
+  .day.today{border-color:var(--accent)}
+  /* full-bleed 헤더 바 — 오늘은 강조색으로 채워 대시보드처럼 (시그니처) */
+  .dayHead{margin:-12px -12px 12px; padding:11px 12px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; font-family:var(--serif); font-weight:600; font-size:14px}
+  .dayHead .date{font-family:'Segoe UI','Malgun Gothic',sans-serif; color:var(--sub); font-weight:400; font-size:12px; margin-left:5px}
+  .dayHead .todayTag{font-family:'Segoe UI','Malgun Gothic',sans-serif; font-size:10px; font-weight:700; letter-spacing:0.04em; background:rgba(255,255,255,.22); padding:2px 7px; border-radius:99px}
+  .dayHead .hd-right{display:flex; align-items:center; gap:8px}
+  .dayHead .chev{display:none; font-size:11px; opacity:.75}
+  .day.today .dayHead{background:var(--accent); color:#fff; border-bottom-color:var(--accent)}
+  .day.today .dayHead .date{color:rgba(255,255,255,.8)}
+  .day.collapsed .cards,.day.collapsed .addTask,.day.collapsed .tlDay{display:none}
+  .day.collapsed{min-height:auto; padding-bottom:0}
+  .day.collapsed .dayHead{margin-bottom:0}
+
+  /* 할 일 = 카드가 아니라 얇은 한 줄 목록 행 */
+  .cards{list-style:none; padding:0; flex:1; display:flex; flex-direction:column; min-height:30px}
+  .card{display:flex; align-items:center; gap:8px; padding:6px 6px 6px 9px; font-size:13px; line-height:1.35;
+        border-left:3px solid transparent; border-bottom:1px solid var(--line-2); cursor:grab; background:var(--card)}
+  .card:hover{background:var(--paper)}
+  .card.dragging{opacity:.4}
+  .card .title{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .card .mk{font-size:11px; color:var(--sub); white-space:nowrap}
+  .card .acts{display:none; gap:6px}
+  .card.expanded{flex-wrap:wrap}                          /* 클릭하면 버튼이 아래 줄로 */
+  .card.expanded .title{white-space:normal}
+  .card.expanded .acts{display:flex; flex-basis:100%; margin-top:7px; flex-wrap:wrap}
+  .card .acts button{border:1px solid var(--line); background:var(--card); border-radius:var(--r3); font-size:14px; line-height:1; padding:6px 0; width:34px; text-align:center}
+  .card .acts button:hover{border-color:var(--accent)}
+  .card .acts button.on{background:var(--accent); border-color:var(--accent); color:#fff}
+  /* 상태는 왼쪽 색선으로만 (할 일은 표시 없음) */
+  .card.doing{border-left-color:var(--doing)}
+  .card.done{border-left-color:var(--done)}
+  .card.done .title{text-decoration:line-through; color:var(--sub)}
+  .card.delayed{border-left-color:var(--delay)}
+  .card.skipped{border-left-color:var(--skip)}
+  .card.skipped .title{color:var(--sub)}
+  .addTask{margin-top:8px; display:flex; gap:6px}
+  .addTask input{flex:1; min-width:0; border:1px solid var(--line); border-radius:var(--r3); padding:7px 10px; font-size:13px; background:var(--card)}
+  .addTask input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash)}
+  .addTask button{border:none; background:var(--accent); color:#fff; border-radius:var(--r3); width:30px; flex-shrink:0; font-size:16px; line-height:1}
+  .addTask button:hover{background:var(--accent-ink)}
+
+  /* 요일별 세로 집중 트랙 (0시 위 → 24시 아래) */
+  .tlDay{margin-top:12px; border-top:1px solid var(--line-2); padding-top:10px}
+  .tlCount{font-size:11px; color:var(--sub); min-height:15px; margin-bottom:5px; font-weight:500}
+  .tlRow{display:flex; gap:6px}
+  .tlHours{display:flex; flex-direction:column; justify-content:space-between; font-size:9px; color:var(--sub); text-align:right; height:150px}
+  .track{position:relative; flex:1; height:150px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r3); overflow:hidden}
+  .htick{position:absolute; left:0; right:0; height:1px; background:var(--line)}
+  .hseg{position:absolute; left:0; right:0; border-radius:2px; border:1px solid var(--card)}
+
+  /* Mobile */
+  @media (max-width:900px){
+    header{padding:14px 16px; gap:10px}
+    header h1{font-size:21px}
+    #tlPanel{padding:14px 16px 0}
+    main{flex-direction:column; padding:12px 16px 24px; align-items:stretch}  /* stretch: 보드·사이드바 폭 동일 */
+    aside{width:100%; position:static}
+    .board{order:-1; grid-template-columns:1fr; overflow:visible; gap:10px; width:100%}  /* 보드를 맨 위로, 7일 세로 스택 */
+    .day.today{order:-1}                                /* 요일과 무관하게 오늘을 최상단으로 */
+    .day{min-height:auto}
+    .track,.tlHours{height:112px}
+    .legend{width:100%; margin-left:0; order:5}
+    .dayHead{cursor:pointer; margin-bottom:0}           /* 탭하면 접기/펼치기 */
+    .day:not(.collapsed) .dayHead{margin-bottom:12px}
+    .dayHead .chev{display:inline-block; transition:transform .15s}
+    .day.collapsed .dayHead .chev{transform:rotate(-90deg)}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>나의 하루<span class="dot">.</span></h1>
+  <div class="weeknav">
+    <button id="prevW" title="지난 주">◀</button>
+    <span class="range" id="weekRange"></span>
+    <button id="nextW" title="다음 주">▶</button>
+    <button id="todayW">오늘</button>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--accent)"></i>할 일</span>
+    <span><i style="background:var(--doing)"></i>진행중</span>
+    <span><i style="background:var(--done)"></i>완료</span>
+    <span><i style="background:var(--delay)"></i>딜레이</span>
+    <span><i style="background:var(--skip)"></i>안 함</span>
+  </div>
+  <button id="keyBtn" title="AI 기능에 쓸 Google Gemini API 키 (무료)">🔑 AI 키</button>
+  <button id="syncBtn" title="GitHub Gist로 다른 기기와 데이터 동기화">☁ 동기화</button>
+</header>
+
+<section id="tlPanel">
+  <div class="eyebrow">이번 주 집중 기록</div>
+  <div id="tlLegend"></div>
+</section>
+
+<main>
+  <aside>
+    <div class="panel">
+      <div class="eyebrow">🤖 AI로 할 일 만들기</div>
+      <textarea id="goalInput" placeholder="목표를 입력하세요. 예: 다음 주까지 포트폴리오 웹사이트 완성하기"></textarea>
+      <button id="aiBtn">목표 분석해서 할 일 추가</button>
+      <div id="aiMsg"></div>
+    </div>
+    <div class="panel">
+      <div class="eyebrow">🍅 집중 타이머</div>
+      <div id="pomoMode">집중 25분</div>
+      <div id="pomoTime">25:00</div>
+      <div class="pomoBtns">
+        <button id="pomoStart">시작</button>
+        <button id="pomoReset">리셋</button>
+      </div>
+      <select id="pomoTask"><option value="">집중할 오늘 할 일 선택 (선택)</option></select>
+      <div id="pomoCount"></div>
+    </div>
+    <div class="panel">
+      <div class="calHead">
+        <button id="calPrev">◀</button>
+        <div class="eyebrow" id="calTitle"></div>
+        <button id="calNext">▶</button>
+      </div>
+      <div id="cal"></div>
+    </div>
+    <div class="panel">
+      <div class="eyebrow">📝 메모</div>
+      <textarea id="notes" placeholder="자유롭게 메모하세요. 자동 저장됩니다."></textarea>
+    </div>
+  </aside>
+  <section class="board" id="board"></section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
