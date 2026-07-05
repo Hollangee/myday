@@ -4,7 +4,7 @@
 // ---------- state ----------
 const LS = 'myday-v1';
 const state = Object.assign(
-  { tasks: [], notes: '', apiKey: '', pomoDone: 0, sessions: [], updatedAt: 0, gistToken: '', gistId: '' },
+  { tasks: [], events: [], notes: '', apiKey: '', pomoDone: 0, sessions: [], updatedAt: 0, gistToken: '', gistId: '', workMin: 25, breakMin: 5 },
   JSON.parse(localStorage.getItem(LS) || '{}')
 );
 const save = () => { state.updatedAt = Date.now(); localStorage.setItem(LS, JSON.stringify(state)); schedulePush(); };
@@ -57,6 +57,19 @@ function renderBoard() {
     if (isMobile() && ds !== t) col.classList.add('collapsed');  // 모바일: 오늘만 펼치고 나머지 접기
     col.innerHTML = `<div class="dayHead"><span>${DAYS[i]}<span class="date">${d.getMonth() + 1}/${d.getDate()}</span></span><span class="hd-right">${ds === t ? '<span class="todayTag">오늘</span>' : ''}<span class="chev">▾</span></span></div>`;
     col.querySelector('.dayHead').addEventListener('click', () => { if (isMobile()) col.classList.toggle('collapsed'); });
+    // 일정(시간 있는 약속)
+    const evbox = document.createElement('div');
+    evbox.className = 'evbox';
+    evbox.innerHTML = '<div class="dsec">일정</div>';
+    const evs = document.createElement('div'); evs.className = 'evs';
+    state.events.filter(e => e.date === ds).sort((a, b) => a.time.localeCompare(b.time))
+      .forEach(e => evs.appendChild(evEl(e)));
+    evbox.appendChild(evs);
+    evbox.appendChild(addEvForm(ds));
+    col.appendChild(evbox);
+    // 할 일
+    const tlabel = document.createElement('div'); tlabel.className = 'dsec'; tlabel.textContent = '할 일';
+    col.appendChild(tlabel);
     const ul = document.createElement('ul');
     ul.className = 'cards';
     ul.dataset.date = ds;
@@ -145,6 +158,32 @@ function cardEl(task) {
   return li;
 }
 
+// ---------- 일정(약속) ----------
+function evEl(e) {
+  const row = document.createElement('div');
+  row.className = 'ev';
+  row.innerHTML = `<span class="evTime">${e.time}</span><span class="evTitle" title="${esc(e.title)}">${esc(e.title)}</span><button class="evDel" title="삭제">×</button>`;
+  row.querySelector('.evDel').addEventListener('click', () => {
+    state.events = state.events.filter(x => x.id !== e.id); save(); renderBoard();
+  });
+  return row;
+}
+function addEvForm(date) {
+  const div = document.createElement('div');
+  div.className = 'addEv';
+  div.innerHTML = `<input type="time" value="09:00"><input type="text" placeholder="+ 일정" maxlength="100"><button title="일정 추가">＋</button>`;
+  const [time, title] = div.querySelectorAll('input');
+  const add = () => {
+    const t = title.value.trim();
+    if (!t) return;
+    state.events.push({ id: uid(), date, time: time.value || '09:00', title: t });
+    save(); renderBoard();
+  };
+  title.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+  div.querySelector('button').addEventListener('click', add);
+  return div;
+}
+
 function addForm(date) {
   const div = document.createElement('div');
   div.className = 'addTask';
@@ -167,7 +206,7 @@ function onAct(id, act) {
   if (act === 'focus') {
     document.getElementById('pomoTask').value = id;
     clearInterval(pomo.timer);
-    pomo.mode = 'work'; pomo.left = WORK;
+    pomo.mode = 'work'; pomo.left = workSec();
     pomo.timer = setInterval(pomoTick, 1000);
     pomoRender();
     document.getElementById('pomoTime').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -239,14 +278,15 @@ notesEl.value = state.notes;
 notesEl.addEventListener('input', () => { state.notes = notesEl.value; save(); });
 
 // ---------- pomodoro ----------
-const WORK = 25 * 60, BREAK = 5 * 60;
-let pomo = { mode: 'work', left: WORK, timer: null };
+const workSec = () => (state.workMin || 25) * 60;   // 설정값 기반(기본 25/5분)
+const breakSec = () => (state.breakMin || 5) * 60;
+let pomo = { mode: 'work', left: workSec(), timer: null };
 
 function pomoRender() {
   const m = String(Math.floor(pomo.left / 60)).padStart(2, '0');
   const s = String(pomo.left % 60).padStart(2, '0');
   document.getElementById('pomoTime').textContent = `${m}:${s}`;
-  document.getElementById('pomoMode').textContent = pomo.mode === 'work' ? '집중 25분' : '휴식 5분';
+  document.getElementById('pomoMode').textContent = pomo.mode === 'work' ? `집중 ${state.workMin || 25}분` : `휴식 ${state.breakMin || 5}분`;
   document.getElementById('pomoStart').textContent = pomo.timer ? '일시정지' : '시작';
   document.getElementById('pomoCount').textContent = `오늘까지 완료한 포모도로: ${state.pomoDone}회`;
 }
@@ -259,12 +299,12 @@ function pomoTick() {
     const sel = document.getElementById('pomoTask').value;
     const task = state.tasks.find(x => x.id === sel);
     if (task) task.pomos = (task.pomos || 0) + 1;
-    state.sessions.push({ start: Date.now() - WORK * 1000, min: 25, title: task ? task.title : '집중' });
+    state.sessions.push({ start: Date.now() - workSec() * 1000, min: state.workMin || 25, title: task ? task.title : '집중' });
     save();
-    pomo.mode = 'break'; pomo.left = BREAK;
+    pomo.mode = 'break'; pomo.left = breakSec();
     renderBoard();
   } else {
-    pomo.mode = 'work'; pomo.left = WORK;
+    pomo.mode = 'work'; pomo.left = workSec();
   }
   pomoRender();
 }
@@ -275,9 +315,19 @@ document.getElementById('pomoStart').onclick = () => {
 };
 document.getElementById('pomoReset').onclick = () => {
   clearInterval(pomo.timer); pomo.timer = null;
-  pomo.left = pomo.mode === 'work' ? WORK : BREAK;
+  pomo.left = pomo.mode === 'work' ? workSec() : breakSec();
   pomoRender();
 };
+// 타이머 시간 설정
+function applyPomoSettings() {
+  const w = Math.min(90, Math.max(1, parseInt(document.getElementById('workMin').value, 10) || 25));
+  const b = Math.min(60, Math.max(1, parseInt(document.getElementById('breakMin').value, 10) || 5));
+  state.workMin = w; state.breakMin = b; save();
+  if (!pomo.timer) { pomo.left = pomo.mode === 'work' ? workSec() : breakSec(); }  // 실행 중이 아니면 즉시 반영
+  pomoRender();
+}
+document.getElementById('workMin').addEventListener('change', applyPomoSettings);
+document.getElementById('breakMin').addEventListener('change', applyPomoSettings);
 function renderPomoTasks() {
   const sel = document.getElementById('pomoTask');
   const cur = sel.value;
@@ -360,7 +410,7 @@ document.getElementById('aiBtn').onclick = async () => {
 
 // ---------- 동기화 (GitHub Gist) ----------
 // ponytail: last-write-wins 전체 덮어쓰기 — 1인용이라 충돌 병합은 필요해지면 추가
-const SYNC_KEYS = ['tasks', 'notes', 'pomoDone', 'sessions', 'updatedAt']; // API 키·토큰은 기기별 보관(동기화 제외)
+const SYNC_KEYS = ['tasks', 'events', 'notes', 'pomoDone', 'sessions', 'updatedAt', 'workMin', 'breakMin']; // API 키·토큰은 기기별 보관(동기화 제외)
 const ghHeaders = () => ({ 'Authorization': 'Bearer ' + state.gistToken, 'Accept': 'application/vnd.github+json' });
 let pushT = null;
 function schedulePush() {
@@ -443,6 +493,8 @@ function runSelfTest() {
 }
 
 // ---------- init ----------
+document.getElementById('workMin').value = state.workMin || 25;
+document.getElementById('breakMin').value = state.breakMin || 5;
 if (rolloverTasks(state.tasks, today())) save();
 pomoRender();
 renderBoard();
