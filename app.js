@@ -295,10 +295,10 @@ function beep() {
   } catch (e) { /* 소리 실패는 무시 */ }
 }
 
-// ---------- AI: 목표 → 할 일 분해 (Google Gemini, 브라우저 직접 호출) ----------
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// ---------- AI: 목표 → 할 일 분해 (Groq, 브라우저 직접 호출 · 무료 · 카드 불필요) ----------
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 document.getElementById('keyBtn').onclick = () => {
-  const k = prompt('Google Gemini API 키를 입력하세요 (무료: aistudio.google.com/apikey — 이 브라우저에만 저장됩니다):', state.apiKey || '');
+  const k = prompt('Groq API 키를 입력하세요 (무료: console.groq.com/keys — gsk_… · 이 브라우저에만 저장됩니다):', state.apiKey || '');
   if (k !== null) { state.apiKey = k.trim(); save(); }
 };
 
@@ -306,52 +306,38 @@ document.getElementById('aiBtn').onclick = async () => {
   const goal = document.getElementById('goalInput').value.trim();
   const msg = document.getElementById('aiMsg');
   if (!goal) { msg.textContent = '목표를 먼저 입력하세요.'; return; }
-  if (!state.apiKey) { msg.textContent = '우측 상단 🔑 버튼으로 Gemini API 키를 먼저 넣으세요 (무료).'; return; }
+  if (!state.apiKey) { msg.textContent = '우측 상단 🔑 버튼으로 Groq API 키를 먼저 넣으세요 (무료).'; return; }
   const btn = document.getElementById('aiBtn');
   btn.disabled = true; msg.textContent = 'AI가 목표를 분석 중...';
   try {
     const reqBody = JSON.stringify({
-        contents: [{ parts: [{ text:
-          `다음 목표를 달성하기 위해 필요한 구체적인 할 일 목록을 만들어줘. 오늘(day_offset=0)부터 6일 뒤(day_offset=6)까지 일주일 안에 현실적으로 배치해. 각 할 일 제목은 한국어로 짧고 실행 가능하게. 3~10개.\n\n목표: ${goal}` }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'OBJECT',
-            properties: {
-              tasks: {
-                type: 'ARRAY',
-                items: {
-                  type: 'OBJECT',
-                  properties: { title: { type: 'STRING' }, day_offset: { type: 'INTEGER' } },
-                  required: ['title', 'day_offset'],
-                },
-              },
-            },
-            required: ['tasks'],
-          },
-        },
-      });
-    const send = () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+      model: GROQ_MODEL,
+      response_format: { type: 'json_object' },
+      temperature: 0.4,
+      max_tokens: 1024,
+      messages: [
+        { role: 'system', content: '너는 요청된 JSON 형식만 정확히 출력한다. 설명·코드블록 없이 JSON만.' },
+        { role: 'user', content:
+          `다음 목표를 달성하기 위해 필요한 구체적인 할 일 목록을 만들어줘. 오늘(day_offset=0)부터 6일 뒤(day_offset=6)까지 일주일 안에 현실적으로 배치해. 각 할 일 제목은 한국어로 짧고 실행 가능하게. 3~10개.\n목표: ${goal}\n\n다음 형식의 JSON만 출력: {"tasks":[{"title":"<할 일>","day_offset":<0~6 정수>}]}` },
+      ],
+    });
+    const send = () => fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': state.apiKey },
+      headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + state.apiKey },
       body: reqBody,
     });
     let res = await send();
     if (res.status === 429) {
-      // Gemini 무료 한도: 분당 한도면 잠깐 뒤 자동 재시도, 일일/프로젝트 한도면 안내
-      const errText = await res.clone().text();
-      if (/per\s*minute|PerMinute/i.test(errText)) {
-        msg.textContent = '무료 분당 한도 도달 — 35초 후 자동 재시도합니다…';
-        await new Promise(r => setTimeout(r, 35000));
-        res = await send();
-      }
-      if (res.status === 429) {
-        throw new Error('Gemini 무료 사용량 한도(429)를 초과했습니다. 잠시 후(분당 한도) 또는 내일(일일 한도) 다시 시도하거나, aistudio.google.com에서 결제를 연결하면 한도가 크게 늘어납니다.');
-      }
+      // 분당 한도면 retry-after만큼(최대 30초) 자동 재시도
+      const wait = Math.min(30, parseInt(res.headers.get('retry-after') || '0', 10) || 20);
+      msg.textContent = `무료 한도 도달 — ${wait}초 후 자동 재시도합니다…`;
+      await new Promise(r => setTimeout(r, wait * 1000));
+      res = await send();
+      if (res.status === 429) throw new Error('Groq 무료 사용량 한도(429)를 초과했습니다. 잠시 후 다시 시도하세요.');
     }
     if (!res.ok) throw new Error(`API 오류 ${res.status}: ${(await res.text()).slice(0, 300)}`);
     const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = data.choices?.[0]?.message?.content;
     if (!text) throw new Error('응답이 비어 있습니다');
     const tasks = JSON.parse(text).tasks || [];
     const base = new Date();
