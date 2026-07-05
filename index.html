@@ -108,23 +108,33 @@
   .day.collapsed{min-height:auto; padding-bottom:0}
   .day.collapsed .dayHead{margin-bottom:0}
 
-  /* 섹션 라벨 (일정 / 할 일) */
-  .dsec{font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--sub); margin:2px 0 6px}
-  /* 일정 (시간 있는 약속) — design.md(Cal.com) 참고: 시간 우선·헤어라인·모노톤 */
-  .evbox{margin-bottom:12px}
-  .evs{display:flex; flex-direction:column}
-  .ev{display:flex; align-items:center; gap:8px; padding:5px 2px; border-bottom:1px solid var(--line-2); font-size:13px}
-  .ev:hover{background:var(--paper)}
-  .evTime{font-variant-numeric:tabular-nums; color:var(--accent-ink); font-weight:700; font-size:12px; flex-shrink:0}
-  .evTitle{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .evDel{border:none; background:none; color:var(--sub); font-size:15px; line-height:1; cursor:pointer; padding:0 2px; opacity:0}
-  .ev:hover .evDel,.evDel:focus{opacity:1}
-  .addEv{display:flex; gap:5px; margin-top:6px}
-  .addEv input[type=time]{width:84px; flex-shrink:0; border:1px solid var(--line); border-radius:var(--r3); padding:6px; font-size:12px; background:var(--card); font-family:inherit}
-  .addEv input[type=text]{flex:1; min-width:0; border:1px solid var(--line); border-radius:var(--r3); padding:6px 10px; font-size:13px; background:var(--card)}
-  .addEv input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash)}
-  .addEv button{border:none; background:var(--accent-ink); color:#fff; border-radius:var(--r3); width:30px; flex-shrink:0; font-size:16px; line-height:1}
-  .addEv button:hover{background:var(--accent-deep)}
+  /* 일정 달력 — design.md(Cal.com) 참고: 흰 캔버스·헤어라인·8/12px 라운드·모노톤 */
+  #schedule{max-width:1640px; margin:0 auto; padding:6px 28px 40px}
+  .schedHead{display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap}
+  .schedNav{display:flex; align-items:center; gap:6px}
+  .schedNav button{border:1px solid var(--line); background:var(--card); border-radius:var(--r3); padding:6px 12px; font-size:13px}
+  .schedNav button:hover{border-color:var(--accent); color:var(--accent)}
+  #schedTitle{font-family:var(--serif); font-weight:700; font-size:17px; min-width:120px; text-align:center}
+  .schedAdd{display:flex; gap:6px; margin-left:auto; flex-wrap:wrap}
+  .schedAdd input{border:1px solid var(--line); border-radius:var(--r3); padding:8px 10px; font-size:13px; background:var(--card); font-family:inherit; height:38px}
+  .schedAdd input[type=date]{width:150px} .schedAdd input[type=time]{width:104px} .schedAdd input[type=text]{width:200px}
+  .schedAdd input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash)}
+  .schedAdd button{border:none; background:var(--accent-ink); color:#fff; border-radius:var(--r3); padding:0 18px; height:38px; font-weight:600; font-size:13px}
+  .schedAdd button:hover{background:var(--accent-deep)}
+  #schedGrid{border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--card); box-shadow:var(--shadow)}
+  .scRow{display:grid; grid-template-columns:repeat(7,1fr)}
+  .scHead .scHd{padding:9px; font-size:11px; font-weight:700; color:var(--sub); text-align:center; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid var(--line)}
+  .scCell{min-height:96px; border-right:1px solid var(--line-2); border-bottom:1px solid var(--line-2); padding:6px; cursor:pointer; overflow:hidden}
+  .scRow .scCell:last-child{border-right:none}
+  .scCell:hover{background:var(--paper)}
+  .scCell.other{background:#fbfafb}
+  .scCell.other .scNum{color:#c7ccd6}
+  .scNum{font-size:12px; font-weight:600; margin-bottom:5px; line-height:22px}
+  .scCell.today .scNum{background:var(--accent); color:#fff; border-radius:99px; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center}
+  .scChip{font-size:11px; background:var(--accent-wash); color:var(--accent-ink); border-radius:4px; padding:2px 6px; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .scChip b{font-variant-numeric:tabular-nums; font-weight:700}
+  .scChip:hover{background:#f6dfe9}
+  .scMore{font-size:10px; color:var(--sub); padding-left:2px}
 
   /* 할 일 = 카드가 아니라 얇은 한 줄 목록 행 */
   .cards{list-style:none; padding:0; flex:1; display:flex; flex-direction:column; min-height:30px}
@@ -179,6 +189,11 @@
     .day:not(.collapsed) .dayHead{margin-bottom:12px}
     .dayHead .chev{display:inline-block; transition:transform .15s}
     .day.collapsed .dayHead .chev{transform:rotate(-90deg)}
+    #schedule{padding:6px 16px 28px}
+    .schedAdd{width:100%; margin-left:0}
+    .schedAdd input[type=text]{flex:1; width:auto; min-width:0}
+    .scCell{min-height:64px; padding:4px}
+    .scChip{font-size:10px; padding:1px 4px}
   }
 </style>
 </head>
@@ -242,6 +257,26 @@
   </aside>
   <section class="board" id="board"></section>
 </main>
+
+<section id="schedule">
+  <div class="eyebrow">📅 일정 달력</div>
+  <div class="schedHead">
+    <div class="schedNav">
+      <button id="schedPrev" title="지난 달">◀</button>
+      <span id="schedTitle"></span>
+      <button id="schedNext" title="다음 달">▶</button>
+      <button id="schedToday">오늘</button>
+    </div>
+    <div class="schedAdd">
+      <input type="date" id="schedDate">
+      <input type="time" id="schedTime" value="09:00">
+      <input type="text" id="schedTitleInput" placeholder="일정 제목" maxlength="100">
+      <button id="schedAddBtn">일정 추가</button>
+    </div>
+  </div>
+  <div id="schedGrid"></div>
+</section>
+
 <script src="app.js"></script>
 </body>
 </html>

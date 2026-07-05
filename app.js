@@ -57,19 +57,6 @@ function renderBoard() {
     if (isMobile() && ds !== t) col.classList.add('collapsed');  // 모바일: 오늘만 펼치고 나머지 접기
     col.innerHTML = `<div class="dayHead"><span>${DAYS[i]}<span class="date">${d.getMonth() + 1}/${d.getDate()}</span></span><span class="hd-right">${ds === t ? '<span class="todayTag">오늘</span>' : ''}<span class="chev">▾</span></span></div>`;
     col.querySelector('.dayHead').addEventListener('click', () => { if (isMobile()) col.classList.toggle('collapsed'); });
-    // 일정(시간 있는 약속)
-    const evbox = document.createElement('div');
-    evbox.className = 'evbox';
-    evbox.innerHTML = '<div class="dsec">일정</div>';
-    const evs = document.createElement('div'); evs.className = 'evs';
-    state.events.filter(e => e.date === ds).sort((a, b) => a.time.localeCompare(b.time))
-      .forEach(e => evs.appendChild(evEl(e)));
-    evbox.appendChild(evs);
-    evbox.appendChild(addEvForm(ds));
-    col.appendChild(evbox);
-    // 할 일
-    const tlabel = document.createElement('div'); tlabel.className = 'dsec'; tlabel.textContent = '할 일';
-    col.appendChild(tlabel);
     const ul = document.createElement('ul');
     ul.className = 'cards';
     ul.dataset.date = ds;
@@ -91,6 +78,7 @@ function renderBoard() {
   renderPomoTasks();
   renderCal();
   renderTimeline();
+  renderSchedule();
 }
 
 // ---------- 24시간 활동 타임라인 ----------
@@ -158,31 +146,55 @@ function cardEl(task) {
   return li;
 }
 
-// ---------- 일정(약속) ----------
-function evEl(e) {
-  const row = document.createElement('div');
-  row.className = 'ev';
-  row.innerHTML = `<span class="evTime">${e.time}</span><span class="evTitle" title="${esc(e.title)}">${esc(e.title)}</span><button class="evDel" title="삭제">×</button>`;
-  row.querySelector('.evDel').addEventListener('click', () => {
-    state.events = state.events.filter(x => x.id !== e.id); save(); renderBoard();
-  });
-  return row;
+// ---------- 일정 달력 (주간 보드 아래 월 달력) ----------
+let schedBase = new Date(); schedBase.setDate(1);
+function renderSchedule() {
+  document.getElementById('schedTitle').textContent = `${schedBase.getFullYear()}년 ${schedBase.getMonth() + 1}월`;
+  const start = monday(new Date(schedBase));
+  const t = today();
+  const byDate = {};
+  state.events.forEach(e => { (byDate[e.date] = byDate[e.date] || []).push(e); });
+  let html = '<div class="scRow scHead">' + DAYS.map(d => `<div class="scHd">${d}</div>`).join('') + '</div>';
+  for (let w = 0; w < 6; w++) {
+    html += '<div class="scRow">';
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(start, w * 7 + i);
+      const ds = ymd(d);
+      const other = d.getMonth() !== schedBase.getMonth();
+      const evs = (byDate[ds] || []).sort((a, b) => a.time.localeCompare(b.time));
+      const chips = evs.slice(0, 3).map(e =>
+        `<div class="scChip" data-id="${e.id}" title="클릭해서 삭제: ${esc(e.time)} ${esc(e.title)}"><b>${e.time}</b> ${esc(e.title)}</div>`).join('');
+      const more = evs.length > 3 ? `<div class="scMore">+${evs.length - 3}개 더</div>` : '';
+      html += `<div class="scCell${other ? ' other' : ''}${ds === t ? ' today' : ''}" data-date="${ds}"><div class="scNum">${d.getDate()}</div>${chips}${more}</div>`;
+    }
+    html += '</div>';
+  }
+  const grid = document.getElementById('schedGrid');
+  grid.innerHTML = html;
+  grid.querySelectorAll('.scChip').forEach(c => c.addEventListener('click', ev => {
+    ev.stopPropagation();
+    if (confirm('이 일정을 삭제할까요?')) { state.events = state.events.filter(x => x.id !== c.dataset.id); save(); renderSchedule(); }
+  }));
+  grid.querySelectorAll('.scCell').forEach(cell => cell.addEventListener('click', () => {
+    document.getElementById('schedDate').value = cell.dataset.date;
+    document.getElementById('schedTitleInput').focus();
+  }));
 }
-function addEvForm(date) {
-  const div = document.createElement('div');
-  div.className = 'addEv';
-  div.innerHTML = `<input type="time" value="09:00"><input type="text" placeholder="+ 일정" maxlength="100"><button title="일정 추가">＋</button>`;
-  const [time, title] = div.querySelectorAll('input');
-  const add = () => {
-    const t = title.value.trim();
-    if (!t) return;
-    state.events.push({ id: uid(), date, time: time.value || '09:00', title: t });
-    save(); renderBoard();
-  };
-  title.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
-  div.querySelector('button').addEventListener('click', add);
-  return div;
+function addScheduleEvent() {
+  const date = document.getElementById('schedDate').value;
+  const time = document.getElementById('schedTime').value || '09:00';
+  const ti = document.getElementById('schedTitleInput');
+  const title = ti.value.trim();
+  if (!date) { document.getElementById('schedDate').focus(); return; }
+  if (!title) { ti.focus(); return; }
+  state.events.push({ id: uid(), date, time, title });
+  ti.value = ''; save(); renderSchedule();
 }
+document.getElementById('schedAddBtn').addEventListener('click', addScheduleEvent);
+document.getElementById('schedTitleInput').addEventListener('keydown', e => { if (e.key === 'Enter') addScheduleEvent(); });
+document.getElementById('schedPrev').onclick = () => { schedBase.setMonth(schedBase.getMonth() - 1); renderSchedule(); };
+document.getElementById('schedNext').onclick = () => { schedBase.setMonth(schedBase.getMonth() + 1); renderSchedule(); };
+document.getElementById('schedToday').onclick = () => { schedBase = new Date(); schedBase.setDate(1); renderSchedule(); };
 
 function addForm(date) {
   const div = document.createElement('div');
@@ -204,9 +216,11 @@ function onAct(id, act) {
   const task = state.tasks.find(x => x.id === id);
   if (!task) return;
   if (act === 'focus') {
+    commitSegment();                 // 진행 중이던 집중 구간 기록
     document.getElementById('pomoTask').value = id;
     clearInterval(pomo.timer);
     pomo.mode = 'work'; pomo.left = workSec();
+    pomo.segStart = Date.now();
     pomo.timer = setInterval(pomoTick, 1000);
     pomoRender();
     document.getElementById('pomoTime').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -280,7 +294,19 @@ notesEl.addEventListener('input', () => { state.notes = notesEl.value; save(); }
 // ---------- pomodoro ----------
 const workSec = () => (state.workMin || 25) * 60;   // 설정값 기반(기본 25/5분)
 const breakSec = () => (state.breakMin || 5) * 60;
-let pomo = { mode: 'work', left: workSec(), timer: null };
+let pomo = { mode: 'work', left: workSec(), timer: null, segStart: null };
+
+// 실제로 집중한 구간을 타임라인에 기록 (일시정지·리셋·완료 시점 모두)
+function commitSegment() {
+  if (pomo.mode !== 'work' || !pomo.segStart) return;
+  const sec = Math.round((Date.now() - pomo.segStart) / 1000);
+  pomo.segStart = null;
+  if (sec < 30) return;   // 30초 미만은 노이즈라 제외
+  const sel = document.getElementById('pomoTask').value;
+  const task = state.tasks.find(x => x.id === sel);
+  state.sessions.push({ start: Date.now() - sec * 1000, min: Math.max(1, Math.round(sec / 60)), title: task ? task.title : '집중' });
+  save(); renderTimeline();
+}
 
 function pomoRender() {
   const m = String(Math.floor(pomo.left / 60)).padStart(2, '0');
@@ -295,12 +321,11 @@ function pomoTick() {
   clearInterval(pomo.timer); pomo.timer = null;
   beep();
   if (pomo.mode === 'work') {
+    commitSegment();                 // 완료된 집중 구간 기록
     state.pomoDone++;
     const sel = document.getElementById('pomoTask').value;
     const task = state.tasks.find(x => x.id === sel);
-    if (task) task.pomos = (task.pomos || 0) + 1;
-    state.sessions.push({ start: Date.now() - workSec() * 1000, min: state.workMin || 25, title: task ? task.title : '집중' });
-    save();
+    if (task) { task.pomos = (task.pomos || 0) + 1; save(); }
     pomo.mode = 'break'; pomo.left = breakSec();
     renderBoard();
   } else {
@@ -309,11 +334,12 @@ function pomoTick() {
   pomoRender();
 }
 document.getElementById('pomoStart').onclick = () => {
-  if (pomo.timer) { clearInterval(pomo.timer); pomo.timer = null; }
-  else pomo.timer = setInterval(pomoTick, 1000);
+  if (pomo.timer) { commitSegment(); clearInterval(pomo.timer); pomo.timer = null; }   // 일시정지 → 기록
+  else { if (pomo.mode === 'work') pomo.segStart = Date.now(); pomo.timer = setInterval(pomoTick, 1000); }
   pomoRender();
 };
 document.getElementById('pomoReset').onclick = () => {
+  commitSegment();                   // 리셋 → 그때까지 기록
   clearInterval(pomo.timer); pomo.timer = null;
   pomo.left = pomo.mode === 'work' ? workSec() : breakSec();
   pomoRender();
@@ -495,6 +521,7 @@ function runSelfTest() {
 // ---------- init ----------
 document.getElementById('workMin').value = state.workMin || 25;
 document.getElementById('breakMin').value = state.breakMin || 5;
+document.getElementById('schedDate').value = today();
 if (rolloverTasks(state.tasks, today())) save();
 pomoRender();
 renderBoard();
