@@ -310,10 +310,7 @@ document.getElementById('aiBtn').onclick = async () => {
   const btn = document.getElementById('aiBtn');
   btn.disabled = true; msg.textContent = 'AI가 목표를 분석 중...';
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': state.apiKey },
-      body: JSON.stringify({
+    const reqBody = JSON.stringify({
         contents: [{ parts: [{ text:
           `다음 목표를 달성하기 위해 필요한 구체적인 할 일 목록을 만들어줘. 오늘(day_offset=0)부터 6일 뒤(day_offset=6)까지 일주일 안에 현실적으로 배치해. 각 할 일 제목은 한국어로 짧고 실행 가능하게. 3~10개.\n\n목표: ${goal}` }] }],
         generationConfig: {
@@ -333,9 +330,26 @@ document.getElementById('aiBtn').onclick = async () => {
             required: ['tasks'],
           },
         },
-      }),
+      });
+    const send = () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': state.apiKey },
+      body: reqBody,
     });
-    if (!res.ok) throw new Error(`API 오류 ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    let res = await send();
+    if (res.status === 429) {
+      // Gemini 무료 한도: 분당 한도면 잠깐 뒤 자동 재시도, 일일/프로젝트 한도면 안내
+      const errText = await res.clone().text();
+      if (/per\s*minute|PerMinute/i.test(errText)) {
+        msg.textContent = '무료 분당 한도 도달 — 35초 후 자동 재시도합니다…';
+        await new Promise(r => setTimeout(r, 35000));
+        res = await send();
+      }
+      if (res.status === 429) {
+        throw new Error('Gemini 무료 사용량 한도(429)를 초과했습니다. 잠시 후(분당 한도) 또는 내일(일일 한도) 다시 시도하거나, aistudio.google.com에서 결제를 연결하면 한도가 크게 늘어납니다.');
+      }
+    }
+    if (!res.ok) throw new Error(`API 오류 ${res.status}: ${(await res.text()).slice(0, 300)}`);
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error('응답이 비어 있습니다');
