@@ -482,7 +482,9 @@ function setSync(kind, detail) {
   if (!el) return;
   const label = { off: '⚪ 동기화 꺼짐', busy: '🔄 동기화 중…', ok: '✅ 동기화됨', err: '⚠️ 동기화 오류' }[kind] || '';
   el.className = 'syncState' + (kind === 'ok' ? ' ok' : kind === 'err' ? ' err' : '');
-  el.textContent = label + (detail ? ` · ${detail}` : '');
+  const gid = state.gistId ? ` (Gist …${state.gistId.slice(-6)})` : '';
+  el.textContent = label + (detail ? ` · ${detail}` : '') + (kind === 'off' ? '' : gid);
+  el.title = (state.gistId ? '이 기기 Gist ID: ' + state.gistId + '\n다른 기기도 같은 ID여야 합니다.\n' : '') + '클릭하면 지금 동기화';
 }
 // HTTP 상태 → 사람이 읽는 사유
 const syncReason = code =>
@@ -596,7 +598,12 @@ document.getElementById('breakMin').value = state.breakMin || 5;
 document.getElementById('dayStart').value = state.dayStart || '00:00';
 document.getElementById('dayEnd').value = state.dayEnd || '00:00';
 document.getElementById('schedDate').value = today();
-if (rolloverTasks(state.tasks, logicalToday())) save();
 pomoRender();
 renderBoard();
-syncPull();
+// 순서 중요: 먼저 원격을 가져와 채택(다른 기기 데이터) → 그 다음에 이월/저장.
+// (이월이 먼저면 updatedAt이 '지금'으로 갱신돼 원격이 항상 옛것으로 판정되어 안 가져옴)
+setSync(state.gistToken && state.gistId ? 'busy' : 'off');
+(async () => {
+  await syncPull();
+  if (rolloverTasks(state.tasks, logicalToday())) { save(); renderBoard(); }
+})();
