@@ -149,7 +149,8 @@
         border-left:3px solid transparent; border-bottom:1px solid var(--line-2); cursor:grab; background:var(--card)}
   .card:hover{background:var(--paper)}
   .card.dragging{opacity:.4}
-  .card .title{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:text}
+  .card .title{flex:1; min-width:0; cursor:text; word-break:break-word; overflow:hidden;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3}  /* 길면 최대 3줄까지 줄바꿈 */
   .card .titleInput{flex:1; min-width:0; font:inherit; color:var(--ink); background:var(--card); border:1px solid var(--accent); border-radius:var(--r3); padding:2px 6px}
   .card .titleInput:focus{outline:none; box-shadow:0 0 0 2px var(--accent-wash)}
   .card .mk{font-size:11px; color:var(--sub); white-space:nowrap}
