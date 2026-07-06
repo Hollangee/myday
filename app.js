@@ -160,20 +160,47 @@ function cardEl(task) {
   if (task.pomos) marks.push(`<span class="mk" title="완료한 포모도로">🍅${task.pomos}</span>`);
   const focusBtn = task.status !== 'done' && task.status !== 'skipped' && task.date === logicalToday()
     ? `<button data-act="focus" title="이 할 일로 포모도로 시작">🍅</button>` : '';
-  const editBtn = `<button data-act="edit" title="제목 수정">✎</button>`;
   const actBtns = ACTS.map(([a, ic, t]) => {
     const active = (a === 'delay' ? 'delayed' : a) === task.status;
     return `<button data-act="${a}" class="${active ? 'on' : ''}" title="${t}${active ? ' 해제' : ''}">${ic}</button>`;
   }).join('');
-  li.innerHTML = `<span class="title" title="${esc(task.title)}">${esc(task.title)}</span>${marks.join('')}
-    <div class="acts">${focusBtn}${editBtn}${actBtns}</div>`;
+  li.innerHTML = `<span class="title" title="클릭해서 수정">${esc(task.title)}</span>${marks.join('')}
+    <div class="acts">${focusBtn}${actBtns}</div>`;
   li.addEventListener('dragstart', e => { li.classList.add('dragging'); e.dataTransfer.setData('text/plain', task.id); });
   li.addEventListener('dragend', onDragEnd);
   li.querySelectorAll('button').forEach(b =>
     b.addEventListener('click', e => { e.stopPropagation(); onAct(task.id, b.dataset.act); }));
-  // 카드 클릭 → 액션 버튼 펼치기/접기 (버튼 클릭은 위에서 전파 차단)
+  // 제목 클릭 → 그 자리에서 바로 편집
+  li.querySelector('.title').addEventListener('click', e => { e.stopPropagation(); startEditTask(li, task); });
+  // 카드(제목·버튼 외) 클릭 → 액션 버튼 펼치기/접기
   li.addEventListener('click', () => li.classList.toggle('expanded'));
   return li;
+}
+
+// 할 일 제목 인라인 편집
+function startEditTask(li, task) {
+  if (li.querySelector('.titleInput')) return;
+  li.draggable = false;                       // 편집 중 드래그 방지(텍스트 선택 가능하게)
+  const span = li.querySelector('.title');
+  const input = document.createElement('input');
+  input.className = 'titleInput'; input.value = task.title; input.maxLength = 100;
+  span.replaceWith(input);
+  input.focus(); input.select();
+  let done = false;
+  const finish = keep => {
+    if (done) return; done = true;
+    const v = input.value.trim();
+    if (keep && v && v !== task.title) { task.title = v.slice(0, 100); save(); }
+    renderBoard();
+  };
+  input.addEventListener('mousedown', e => e.stopPropagation());
+  input.addEventListener('click', e => e.stopPropagation());
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') finish(true);
+    else if (e.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', () => finish(true));
 }
 
 // ---------- 일정 달력 (주간 보드 아래 월 달력) ----------
@@ -193,7 +220,7 @@ function renderSchedule() {
       const other = d.getMonth() !== schedBase.getMonth();
       const evs = (byDate[ds] || []).sort((a, b) => a.time.localeCompare(b.time));
       const chips = evs.slice(0, 3).map(e =>
-        `<div class="scChip" data-id="${e.id}" title="클릭해서 삭제: ${esc(e.time)} ${esc(e.title)}"><b>${e.time}</b> ${esc(e.title)}</div>`).join('');
+        `<div class="scChip" data-id="${e.id}" title="클릭해서 수정 (비우면 삭제)"><b>${e.time}</b> ${esc(e.title)}</div>`).join('');
       const more = evs.length > 3 ? `<div class="scMore">+${evs.length - 3}개 더</div>` : '';
       html += `<div class="scCell${other ? ' other' : ''}${ds === t ? ' today' : ''}" data-date="${ds}"><div class="scNum">${d.getDate()}</div>${chips}${more}</div>`;
     }
@@ -203,12 +230,25 @@ function renderSchedule() {
   grid.innerHTML = html;
   grid.querySelectorAll('.scChip').forEach(c => c.addEventListener('click', ev => {
     ev.stopPropagation();
-    if (confirm('이 일정을 삭제할까요?')) { state.events = state.events.filter(x => x.id !== c.dataset.id); save(); renderSchedule(); }
+    editEvent(c.dataset.id);
   }));
   grid.querySelectorAll('.scCell').forEach(cell => cell.addEventListener('click', () => {
     document.getElementById('schedDate').value = cell.dataset.date;
     document.getElementById('schedTitleInput').focus();
   }));
+}
+// 일정 수정: "HH:MM 제목" 한 번에, 비우면 삭제
+function editEvent(id) {
+  const e = state.events.find(x => x.id === id);
+  if (!e) return;
+  const v = prompt('일정 수정 (형식: HH:MM 제목 · 비우면 삭제):', `${e.time} ${e.title}`);
+  if (v === null) return;
+  const s = v.trim();
+  if (!s) { state.events = state.events.filter(x => x.id !== id); save(); renderSchedule(); return; }
+  const m = s.match(/^(\d{1,2}:\d{2})\s+(.+)$/);
+  if (m) { e.time = m[1].padStart(5, '0'); e.title = m[2].slice(0, 100); }
+  else { e.title = s.slice(0, 100); }
+  save(); renderSchedule();
 }
 function addScheduleEvent() {
   const date = document.getElementById('schedDate').value;
@@ -254,11 +294,6 @@ function onAct(id, act) {
     pomo.timer = setInterval(pomoTick, 1000);
     pomoRender();
     document.getElementById('pomoTime').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
-  if (act === 'edit') {
-    const t = prompt('할 일 수정:', task.title);
-    if (t !== null && t.trim()) { task.title = t.trim().slice(0, 100); save(); renderBoard(); }
     return;
   }
   if (act === 'del') state.tasks = state.tasks.filter(x => x.id !== id);
