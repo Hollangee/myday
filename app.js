@@ -511,31 +511,57 @@ async function syncPush() {
     setSync('ok', nowHM());
   } catch (e) { setSync('err', '네트워크'); console.warn('업로드 예외', e); }
 }
-async function syncPull(force) {
+// 의미 있는 데이터가 있는지 (빈 원격으로 로컬을 덮어쓰지 않기 위함)
+const hasData = s => !!(s && ((s.tasks && s.tasks.length) || (s.events && s.events.length) || (s.sessions && s.sessions.length) || (s.notes && s.notes.trim())));
+function adoptRemote(remote) {
+  SYNC_KEYS.forEach(k => { if (k in remote) state[k] = remote[k]; });
+  localStorage.setItem(LS, JSON.stringify(state)); // save() 금지: updatedAt 재갱신 방지
+  notesEl.value = state.notes;
+  document.getElementById('workMin').value = state.workMin || 25;
+  document.getElementById('breakMin').value = state.breakMin || 5;
+  document.getElementById('dayStart').value = state.dayStart || '00:00';
+  document.getElementById('dayEnd').value = state.dayEnd || '00:00';
+  renderBoard();
+}
+async function fetchRemote() {
+  const res = await fetch('https://api.github.com/gists/' + state.gistId, { headers: ghHeaders() });
+  if (!res.ok) return { ok: false, status: res.status };
+  const file = (await res.json()).files?.['myday.json'];
+  return { ok: true, remote: JSON.parse((file && file.content) || '{}') };
+}
+async function syncPull() {
   if (!state.gistToken || !state.gistId) { setSync('off'); return; }
   setSync('busy', '확인');
   try {
-    const res = await fetch('https://api.github.com/gists/' + state.gistId, { headers: ghHeaders() });
-    if (!res.ok) { setSync('err', syncReason(res.status)); console.warn('다운로드 실패', res.status); return; }
-    const file = (await res.json()).files?.['myday.json'];
-    const remote = JSON.parse((file && file.content) || '{}');
-    if (force || (remote.updatedAt || 0) > (state.updatedAt || 0)) {
-      SYNC_KEYS.forEach(k => { if (k in remote) state[k] = remote[k]; });
-      localStorage.setItem(LS, JSON.stringify(state)); // save() 금지: updatedAt 재갱신 방지
-      notesEl.value = state.notes;
-      document.getElementById('workMin').value = state.workMin || 25;
-      document.getElementById('breakMin').value = state.breakMin || 5;
-      document.getElementById('dayStart').value = state.dayStart || '00:00';
-      document.getElementById('dayEnd').value = state.dayEnd || '00:00';
-      renderBoard();
+    const r = await fetchRemote();
+    if (!r.ok) { setSync('err', syncReason(r.status)); console.warn('다운로드 실패', r.status); return; }
+    const remote = r.remote;
+    if ((remote.updatedAt || 0) > (state.updatedAt || 0)) {
+      // 안전장치: 원격이 비었는데 로컬에 데이터가 있으면 덮어쓰지 않고 로컬을 올림(유실 방지·자가복구)
+      if (!hasData(remote) && hasData(state)) { await syncPush(); return; }
+      adoptRemote(remote);
     }
     setSync('ok', nowHM());
   } catch (e) { setSync('err', '네트워크'); console.warn('다운로드 예외', e); }
 }
+// 연동(다른 기기의 Gist ID로): 양쪽 데이터를 비교해 안전하게 처리
+async function syncConnect() {
+  setSync('busy', '확인');
+  try {
+    const r = await fetchRemote();
+    if (!r.ok) { setSync('err', syncReason(r.status)); alert('연동 실패: ' + syncReason(r.status)); return; }
+    const remote = r.remote;
+    if (!hasData(remote)) { await syncPush(); alert('원격이 비어 있어 이 기기 데이터를 올렸습니다.'); return; }
+    if (!hasData(state)) { adoptRemote(remote); setSync('ok', nowHM()); alert('원격 데이터를 가져왔습니다.'); return; }
+    const takeRemote = confirm('양쪽 모두 데이터가 있습니다.\n\n[확인] 원격 데이터로 이 기기를 덮어씀\n[취소] 이 기기 데이터를 원격에 올림');
+    if (takeRemote) { adoptRemote(remote); setSync('ok', nowHM()); alert('원격 데이터를 가져왔습니다.'); }
+    else { await syncPush(); alert('이 기기 데이터를 원격에 올렸습니다.'); }
+  } catch (e) { setSync('err', '네트워크'); alert('연동 중 오류: ' + e.message); }
+}
 // 상태 클릭 → 지금 동기화(내려받고 올리기)
 document.getElementById('syncState').addEventListener('click', async () => {
   if (!state.gistToken || !state.gistId) { alert('먼저 ☁ 동기화를 설정하세요.'); return; }
-  await syncPull(false); await syncPush();
+  await syncPull(); await syncPush();
 });
 document.getElementById('syncBtn').onclick = async () => {
   const tk = prompt('GitHub 개인 토큰(이 브라우저에만 저장)\n※ 반드시 "classic" 토큰 + gist 스코프여야 합니다. 파인그레인드 토큰은 Gist에 안 됩니다.\ngithub.com/settings/tokens → Generate new token (classic) → gist 체크', state.gistToken || '');
@@ -546,9 +572,7 @@ document.getElementById('syncBtn').onclick = async () => {
   if (id === null) return;
   if (id.trim()) {
     state.gistId = id.trim(); save();
-    await syncPull(true);  // 연동은 원격을 강제로 가져옴
-    const el = document.getElementById('syncState');
-    alert(el.classList.contains('err') ? '연동 실패: ' + el.textContent : '연동 완료! 원격 데이터를 가져왔습니다.');
+    await syncConnect();  // 안전 연동: 빈 원격이 로컬을 덮어쓰지 않음
   } else {
     setSync('busy', 'Gist 생성');
     try {
