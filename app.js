@@ -160,12 +160,13 @@ function cardEl(task) {
   if (task.pomos) marks.push(`<span class="mk" title="완료한 포모도로">🍅${task.pomos}</span>`);
   const focusBtn = task.status !== 'done' && task.status !== 'skipped' && task.date === logicalToday()
     ? `<button data-act="focus" title="이 할 일로 포모도로 시작">🍅</button>` : '';
+  const editBtn = `<button data-act="edit" title="제목 수정">✎</button>`;
   const actBtns = ACTS.map(([a, ic, t]) => {
     const active = (a === 'delay' ? 'delayed' : a) === task.status;
     return `<button data-act="${a}" class="${active ? 'on' : ''}" title="${t}${active ? ' 해제' : ''}">${ic}</button>`;
   }).join('');
   li.innerHTML = `<span class="title" title="${esc(task.title)}">${esc(task.title)}</span>${marks.join('')}
-    <div class="acts">${focusBtn}${actBtns}</div>`;
+    <div class="acts">${focusBtn}${editBtn}${actBtns}</div>`;
   li.addEventListener('dragstart', e => { li.classList.add('dragging'); e.dataTransfer.setData('text/plain', task.id); });
   li.addEventListener('dragend', onDragEnd);
   li.querySelectorAll('button').forEach(b =>
@@ -253,6 +254,11 @@ function onAct(id, act) {
     pomo.timer = setInterval(pomoTick, 1000);
     pomoRender();
     document.getElementById('pomoTime').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if (act === 'edit') {
+    const t = prompt('할 일 수정:', task.title);
+    if (t !== null && t.trim()) { task.title = t.trim().slice(0, 100); save(); renderBoard(); }
     return;
   }
   if (act === 'del') state.tasks = state.tasks.filter(x => x.id !== id);
