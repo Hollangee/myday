@@ -40,6 +40,9 @@
   .legend i{display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:middle}
   #keyBtn,#syncBtn{border:1px solid var(--line); background:var(--card); border-radius:var(--r3); padding:6px 12px; font-size:13px}
   #keyBtn:hover,#syncBtn:hover{border-color:var(--accent); color:var(--accent)}
+  .syncState{font-size:12px; color:var(--sub); white-space:nowrap; cursor:pointer}
+  .syncState.err{color:#c0392b; font-weight:600}
+  .syncState.ok{color:var(--done)}
 
   .eyebrow{font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--sub); margin-bottom:12px}
 
@@ -220,6 +223,7 @@
   </div>
   <button id="keyBtn" title="AI 기능에 쓸 Groq API 키 (무료, 카드 불필요)">🔑 AI 키</button>
   <button id="syncBtn" title="GitHub Gist로 다른 기기와 데이터 동기화">☁ 동기화</button>
+  <span id="syncState" class="syncState" title="동기화 상태 (클릭하면 지금 동기화)"></span>
 </header>
 
 <section id="tlPanel">

@@ -475,6 +475,21 @@ document.getElementById('aiBtn').onclick = async () => {
 // ponytail: last-write-wins 전체 덮어쓰기 — 1인용이라 충돌 병합은 필요해지면 추가
 const SYNC_KEYS = ['tasks', 'events', 'notes', 'pomoDone', 'sessions', 'updatedAt', 'workMin', 'breakMin', 'dayStart', 'dayEnd']; // API 키·토큰은 기기별 보관(동기화 제외)
 const ghHeaders = () => ({ 'Authorization': 'Bearer ' + state.gistToken, 'Accept': 'application/vnd.github+json' });
+const nowHM = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${p(d.getHours())}:${p(d.getMinutes())}`; };
+// 상태 표시: off/busy/ok/err
+function setSync(kind, detail) {
+  const el = document.getElementById('syncState');
+  if (!el) return;
+  const label = { off: '⚪ 동기화 꺼짐', busy: '🔄 동기화 중…', ok: '✅ 동기화됨', err: '⚠️ 동기화 오류' }[kind] || '';
+  el.className = 'syncState' + (kind === 'ok' ? ' ok' : kind === 'err' ? ' err' : '');
+  el.textContent = label + (detail ? ` · ${detail}` : '');
+}
+// HTTP 상태 → 사람이 읽는 사유
+const syncReason = code =>
+  code === 401 ? '토큰 무효/만료' :
+  code === 403 ? '권한 부족(gist 스코프?)' :
+  code === 404 ? 'Gist 없음(ID 확인)' :
+  code === 422 ? '요청 형식 오류' : `HTTP ${code}`;
 let pushT = null;
 function schedulePush() {
   if (!state.gistToken || !state.gistId) return;
@@ -482,48 +497,68 @@ function schedulePush() {
   pushT = setTimeout(syncPush, 3000);
 }
 async function syncPush() {
+  if (!state.gistToken || !state.gistId) return;
+  setSync('busy', '업로드');
   try {
     const payload = JSON.stringify(Object.fromEntries(SYNC_KEYS.map(k => [k, state[k]])));
-    await fetch('https://api.github.com/gists/' + state.gistId, {
+    const res = await fetch('https://api.github.com/gists/' + state.gistId, {
       method: 'PATCH', headers: ghHeaders(),
       body: JSON.stringify({ files: { 'myday.json': { content: payload } } }),
     });
-  } catch (e) { console.warn('동기화 업로드 실패', e); }
+    if (!res.ok) { setSync('err', syncReason(res.status)); console.warn('업로드 실패', res.status, await res.text().catch(() => '')); return; }
+    setSync('ok', nowHM());
+  } catch (e) { setSync('err', '네트워크'); console.warn('업로드 예외', e); }
 }
-async function syncPull() {
-  if (!state.gistToken || !state.gistId) return;
+async function syncPull(force) {
+  if (!state.gistToken || !state.gistId) { setSync('off'); return; }
+  setSync('busy', '확인');
   try {
     const res = await fetch('https://api.github.com/gists/' + state.gistId, { headers: ghHeaders() });
-    if (!res.ok) return;
-    const remote = JSON.parse((await res.json()).files['myday.json'].content || '{}');
-    if ((remote.updatedAt || 0) > (state.updatedAt || 0)) {
+    if (!res.ok) { setSync('err', syncReason(res.status)); console.warn('다운로드 실패', res.status); return; }
+    const file = (await res.json()).files?.['myday.json'];
+    const remote = JSON.parse((file && file.content) || '{}');
+    if (force || (remote.updatedAt || 0) > (state.updatedAt || 0)) {
       SYNC_KEYS.forEach(k => { if (k in remote) state[k] = remote[k]; });
-      localStorage.setItem(LS, JSON.stringify(state)); // save() 사용 금지: updatedAt이 갱신돼 원격보다 새 것으로 둔갑
+      localStorage.setItem(LS, JSON.stringify(state)); // save() 금지: updatedAt 재갱신 방지
       notesEl.value = state.notes;
+      document.getElementById('workMin').value = state.workMin || 25;
+      document.getElementById('breakMin').value = state.breakMin || 5;
+      document.getElementById('dayStart').value = state.dayStart || '00:00';
+      document.getElementById('dayEnd').value = state.dayEnd || '00:00';
       renderBoard();
     }
-  } catch (e) { console.warn('동기화 다운로드 실패', e); }
+    setSync('ok', nowHM());
+  } catch (e) { setSync('err', '네트워크'); console.warn('다운로드 예외', e); }
 }
+// 상태 클릭 → 지금 동기화(내려받고 올리기)
+document.getElementById('syncState').addEventListener('click', async () => {
+  if (!state.gistToken || !state.gistId) { alert('먼저 ☁ 동기화를 설정하세요.'); return; }
+  await syncPull(false); await syncPush();
+});
 document.getElementById('syncBtn').onclick = async () => {
-  const tk = prompt('GitHub 개인 토큰을 입력하세요 (gist 권한 필요, 이 브라우저에만 저장):', state.gistToken || '');
+  const tk = prompt('GitHub 개인 토큰(이 브라우저에만 저장)\n※ 반드시 "classic" 토큰 + gist 스코프여야 합니다. 파인그레인드 토큰은 Gist에 안 됩니다.\ngithub.com/settings/tokens → Generate new token (classic) → gist 체크', state.gistToken || '');
   if (tk === null) return;
   state.gistToken = tk.trim();
-  if (!state.gistToken) { state.gistId = ''; save(); alert('동기화를 해제했습니다.'); return; }
+  if (!state.gistToken) { state.gistId = ''; save(); setSync('off'); alert('동기화를 해제했습니다.'); return; }
   const id = prompt('다른 기기와 연동하려면 그 기기에 표시된 Gist ID를 붙여넣으세요.\n처음 설정이면 빈칸으로 두세요 (새로 만듭니다):', state.gistId || '');
   if (id === null) return;
   if (id.trim()) {
     state.gistId = id.trim(); save();
-    await syncPull();
-    alert('연동 완료! 원격 데이터를 가져왔습니다.');
+    await syncPull(true);  // 연동은 원격을 강제로 가져옴
+    const el = document.getElementById('syncState');
+    alert(el.classList.contains('err') ? '연동 실패: ' + el.textContent : '연동 완료! 원격 데이터를 가져왔습니다.');
   } else {
-    const res = await fetch('https://api.github.com/gists', {
-      method: 'POST', headers: ghHeaders(),
-      body: JSON.stringify({ description: '나의 하루 동기화 데이터', public: false, files: { 'myday.json': { content: '{}' } } }),
-    });
-    if (!res.ok) { alert('Gist 생성 실패 (' + res.status + '): 토큰의 gist 권한을 확인하세요.'); return; }
-    state.gistId = (await res.json()).id;
-    save(); syncPush();
-    alert('동기화 시작!\n다른 기기의 ☁ 동기화 설정에서 아래 Gist ID를 입력하세요:\n\n' + state.gistId);
+    setSync('busy', 'Gist 생성');
+    try {
+      const res = await fetch('https://api.github.com/gists', {
+        method: 'POST', headers: ghHeaders(),
+        body: JSON.stringify({ description: '나의 하루 동기화 데이터', public: false, files: { 'myday.json': { content: '{}' } } }),
+      });
+      if (!res.ok) { setSync('err', syncReason(res.status)); alert('Gist 생성 실패 (' + syncReason(res.status) + ')\n토큰이 classic + gist 스코프인지 확인하세요.'); return; }
+      state.gistId = (await res.json()).id;
+      save(); await syncPush();
+      alert('동기화 시작!\n다른 기기의 ☁ 동기화 설정에서 아래 Gist ID를 입력하세요:\n\n' + state.gistId);
+    } catch (e) { setSync('err', '네트워크'); alert('Gist 생성 중 네트워크 오류: ' + e.message); }
   }
 };
 
