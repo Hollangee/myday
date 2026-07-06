@@ -291,6 +291,7 @@ function onAct(id, act) {
     clearInterval(pomo.timer);
     pomo.mode = 'work'; pomo.left = workSec();
     pomo.segStart = Date.now();
+    pomo.endAt = Date.now() + pomo.left * 1000;
     pomo.timer = setInterval(pomoTick, 1000);
     pomoRender();
     document.getElementById('pomoTime').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -364,7 +365,7 @@ notesEl.addEventListener('input', () => { state.notes = notesEl.value; save(); }
 // ---------- pomodoro ----------
 const workSec = () => (state.workMin || 25) * 60;   // 설정값 기반(기본 25/5분)
 const breakSec = () => (state.breakMin || 5) * 60;
-let pomo = { mode: 'work', left: workSec(), timer: null, segStart: null };
+let pomo = { mode: 'work', left: workSec(), timer: null, segStart: null, endAt: 0 };
 
 // 실제로 집중한 구간을 타임라인에 기록 (일시정지·리셋·완료 시점 모두)
 function commitSegment() {
@@ -374,7 +375,7 @@ function commitSegment() {
   if (sec < 30) return;   // 30초 미만은 노이즈라 제외
   const sel = document.getElementById('pomoTask').value;
   const task = state.tasks.find(x => x.id === sel);
-  state.sessions.push({ start: Date.now() - sec * 1000, min: Math.max(1, Math.round(sec / 60)), title: task ? task.title : '집중' });
+  state.sessions.push({ id: uid(), start: Date.now() - sec * 1000, min: Math.max(1, Math.round(sec / 60)), title: task ? task.title : '집중' });
   save(); renderTimeline();
 }
 
@@ -387,7 +388,9 @@ function pomoRender() {
   document.getElementById('pomoCount').textContent = `오늘까지 완료한 포모도로: ${state.pomoDone}회`;
 }
 function pomoTick() {
-  if (--pomo.left > 0) { pomoRender(); return; }
+  // 시계(끝 시각) 기준 — 화면이 꺼져 setInterval이 멈춰도 복귀 시 정확히 맞춰짐
+  pomo.left = Math.max(0, Math.round((pomo.endAt - Date.now()) / 1000));
+  if (pomo.left > 0) { pomoRender(); return; }
   clearInterval(pomo.timer); pomo.timer = null;
   beep();
   if (pomo.mode === 'work') {
@@ -404,10 +407,19 @@ function pomoTick() {
   pomoRender();
 }
 document.getElementById('pomoStart').onclick = () => {
-  if (pomo.timer) { commitSegment(); clearInterval(pomo.timer); pomo.timer = null; }   // 일시정지 → 기록
-  else { if (pomo.mode === 'work') pomo.segStart = Date.now(); pomo.timer = setInterval(pomoTick, 1000); }
+  if (pomo.timer) {                    // 일시정지
+    pomo.left = Math.max(0, Math.round((pomo.endAt - Date.now()) / 1000));   // 남은 시간 고정
+    commitSegment();
+    clearInterval(pomo.timer); pomo.timer = null;
+  } else {                             // 시작/재개
+    if (pomo.mode === 'work') pomo.segStart = Date.now();
+    pomo.endAt = Date.now() + pomo.left * 1000;
+    pomo.timer = setInterval(pomoTick, 1000);
+  }
   pomoRender();
 };
+// 화면 복귀 시 실시간으로 맞춤(모바일에서 백그라운드 중 멈춘 것 보정)
+document.addEventListener('visibilitychange', () => { if (!document.hidden && pomo.timer) pomoTick(); });
 document.getElementById('pomoReset').onclick = () => {
   commitSegment();                   // 리셋 → 그때까지 기록
   clearInterval(pomo.timer); pomo.timer = null;
@@ -554,8 +566,17 @@ async function syncPush() {
 }
 // 의미 있는 데이터가 있는지 (빈 원격으로 로컬을 덮어쓰지 않기 위함)
 const hasData = s => !!(s && ((s.tasks && s.tasks.length) || (s.events && s.events.length) || (s.sessions && s.sessions.length) || (s.notes && s.notes.trim())));
+// 세션은 순수 기록이라 교체가 아니라 병합(union) — 유실 방지
+const sessionKey = s => s.id || `${s.start}:${s.min}:${s.title}`;
+function mergeSessions(a, b) {
+  const seen = new Set(), out = [];
+  for (const s of [...(a || []), ...(b || [])]) { const k = sessionKey(s); if (!seen.has(k)) { seen.add(k); out.push(s); } }
+  return out.sort((x, y) => x.start - y.start);
+}
 function adoptRemote(remote) {
+  const mergedSessions = mergeSessions(state.sessions, remote.sessions);
   SYNC_KEYS.forEach(k => { if (k in remote) state[k] = remote[k]; });
+  state.sessions = mergedSessions;                 // 세션은 병합해서 이전 기록 유지
   localStorage.setItem(LS, JSON.stringify(state)); // save() 금지: updatedAt 재갱신 방지
   notesEl.value = state.notes;
   document.getElementById('workMin').value = state.workMin || 25;
