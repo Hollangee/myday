@@ -269,16 +269,15 @@ document.getElementById('schedToday').onclick = () => { schedBase = new Date(); 
 function addForm(date) {
   const div = document.createElement('div');
   div.className = 'addTask';
-  div.innerHTML = `<input placeholder="+ 할 일 추가" maxlength="100"><button>＋</button>`;
+  div.innerHTML = `<input placeholder="+ 할 일 추가" maxlength="100">`;
   const input = div.querySelector('input');
-  const add = () => {
+  input.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
     const title = input.value.trim();
     if (!title) return;
     state.tasks.push({ id: uid(), title, date, status: 'todo', order: nextOrder(state.tasks, date), pomos: 0 });
     save(); renderBoard();
-  };
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
-  div.querySelector('button').addEventListener('click', add);
+  });
   return div;
 }
 

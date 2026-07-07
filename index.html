@@ -172,11 +172,10 @@
   .card.delayed{border-left-color:var(--delay)}
   .card.skipped{border-left-color:var(--skip)}
   .card.skipped .title{color:var(--sub)}
-  .addTask{margin-top:8px; display:flex; gap:6px}
-  .addTask input{flex:1; min-width:0; border:1px solid var(--line); border-radius:var(--r3); padding:7px 10px; font-size:13px; background:var(--card)}
-  .addTask input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash)}
-  .addTask button{border:none; background:var(--accent); color:#fff; border-radius:var(--r3); width:30px; flex-shrink:0; font-size:16px; line-height:1}
-  .addTask button:hover{background:var(--accent-ink)}
+  .addTask{margin-top:8px; display:flex}
+  .addTask input{flex:1; min-width:0; border:1px solid transparent; border-radius:var(--r3); padding:7px 8px; font-size:13px; background:transparent; color:var(--ink)}
+  .addTask input::placeholder{color:var(--sub)}
+  .addTask input:focus{outline:none; border-color:var(--line); background:var(--paper)}
 
   /* 요일별 세로 집중 트랙 (0시 위 → 24시 아래) */
   .tlDay{margin-top:12px; border-top:1px solid var(--line-2); padding-top:10px}
