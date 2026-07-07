@@ -5,37 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>나의 하루 — 개인 생산성</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#f4f1f3;       /* 부드러운 웜 로즈그레이 배경 */
+    --paper:#FBF9F5;       /* 따뜻한 종이색 */
     --card:#ffffff;
-    --ink:#241a1f;
-    --sub:#7a6a71;
-    --line:#ece4e8;
-    --line-2:#f4eef1;
-    --accent:#b76b88;      /* 더스티 로즈 */
-    --accent-ink:#9e5474;  /* 솔리드 버튼 */
-    --accent-deep:#854560; /* 버튼 hover */
-    --accent-wash:#f7edf1;
-    --done:#16a34a; --delay:#f59e0b; --skip:#9ca3af; --doing:#0d9488;
-    --serif:'Noto Serif KR',Georgia,'Malgun Gothic',serif;
-    --r:12px; --r2:8px; --r3:6px;   /* 각진 모던 라운드 */
-    --shadow:0 1px 2px rgba(17,21,29,.04), 0 4px 16px rgba(17,21,29,.04);
+    --ink:#1F2430;
+    --sub:#8A8F9C;
+    --line:#E8E4DB;
+    --line-2:#F0EDE6;
+    --accent:#4C5BD4;      /* 페리윙클 블루 */
+    --accent-ink:#4C5BD4;  /* 솔리드 버튼 */
+    --accent-deep:#3D4ABF; /* 버튼 hover */
+    --accent-wash:#EAECFB;
+    --done:#2FA36B; --delay:#E0952B; --skip:#B9375E; --doing:#1D8A82;
+    --serif:'Noto Serif KR',Georgia,'Malgun Gothic',serif; /* 디스플레이 서체 */
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --r:12px; --r2:8px; --r3:6px;
+    --shadow:0 1px 2px rgba(31,36,48,.05), 0 6px 20px rgba(31,36,48,.05);
   }
   *{box-sizing:border-box; margin:0}
-  body{font-family:'Segoe UI','Malgun Gothic',sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased}
+  body{font-family:'Inter','Malgun Gothic',system-ui,sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased;
+    background-image:linear-gradient(var(--line-2) 1px,transparent 1px),linear-gradient(90deg,var(--line-2) 1px,transparent 1px);
+    background-size:26px 26px}  /* 모눈종이 — 이 디자인의 시그니처 */
   button{cursor:pointer; font-family:inherit; color:inherit}
 
   /* Header */
-  header{display:flex; align-items:center; gap:18px; padding:18px 28px; flex-wrap:wrap; max-width:1640px; margin:0 auto; border-bottom:1px solid var(--line)}
-  header h1{font-family:var(--serif); font-weight:700; font-size:24px; letter-spacing:-0.02em}
+  header{display:flex; align-items:center; gap:18px; padding:16px 28px; flex-wrap:wrap; max-width:1640px; margin:0 auto; border-bottom:1px solid var(--line); background:rgba(251,249,245,.85); backdrop-filter:blur(8px)}
+  header h1{font-family:var(--serif); font-weight:700; font-size:22px; letter-spacing:-0.02em}
   header h1 .dot{color:var(--accent)}
   .weeknav{display:flex; align-items:center; gap:4px}
   .weeknav button{border:1px solid var(--line); background:var(--card); border-radius:var(--r3); padding:6px 10px; font-size:13px; line-height:1}
   .weeknav button:hover{border-color:var(--accent); color:var(--accent)}
   .weeknav #todayW{padding:6px 12px}
-  .weeknav .range{font-weight:600; font-size:14px; min-width:120px; text-align:center; font-variant-numeric:tabular-nums}
+  .weeknav .range{font-family:var(--mono); font-weight:500; font-size:13px; min-width:130px; text-align:center}
   .legend{margin-left:auto; display:flex; gap:13px; font-size:12px; color:var(--sub); align-items:center; flex-wrap:wrap}
   .legend i{display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:middle}
   #keyBtn,#syncBtn{border:1px solid var(--line); background:var(--card); border-radius:var(--r3); padding:6px 12px; font-size:13px}
@@ -44,7 +48,7 @@
   .syncState.err{color:#c0392b; font-weight:600}
   .syncState.ok{color:var(--done)}
 
-  .eyebrow{font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--sub); margin-bottom:12px}
+  .eyebrow{font-family:var(--serif); font-size:13px; font-weight:700; letter-spacing:0.02em; color:var(--ink); margin-bottom:12px}
 
   /* Weekly focus legend strip */
   #tlPanel{display:flex; align-items:center; gap:16px; padding:16px 28px 0; flex-wrap:wrap; max-width:1640px; margin:0 auto}
@@ -70,7 +74,7 @@
   #aiMsg{font-size:12px; color:var(--sub); margin-top:8px; min-height:15px}
 
   /* Pomodoro */
-  #pomoTime{font-family:var(--serif); font-size:48px; font-weight:700; text-align:center; font-variant-numeric:tabular-nums; letter-spacing:0.01em; line-height:1.1}
+  #pomoTime{font-family:var(--mono); font-size:46px; font-weight:700; text-align:center; letter-spacing:-0.01em; line-height:1.1}  /* 카운트다운은 데이터 → 모노 */
   #pomoMode{text-align:center; font-size:12px; color:var(--sub); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.06em; font-weight:600}
   .pomoBtns{display:flex; gap:8px; justify-content:center; margin-top:12px}
   .pomoBtns button{border:1px solid var(--line); background:var(--card); border-radius:var(--r2); padding:8px 20px; font-size:13px; font-weight:500}
@@ -102,11 +106,11 @@
   /* Board */
   .board{flex:1; display:grid; grid-template-columns:repeat(7,minmax(150px,1fr)); gap:12px; overflow-x:auto}
   .day{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:12px; min-height:320px; display:flex; flex-direction:column; overflow:hidden; box-shadow:var(--shadow)}
-  .day.today{border-color:var(--accent)}
+  .day.today{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent), 0 10px 30px rgba(76,91,212,.12)}  /* 오늘 칸 스포트라이트 */
   /* full-bleed 헤더 바 — 오늘은 강조색으로 채워 대시보드처럼 (시그니처) */
   .dayHead{margin:-12px -12px 12px; padding:11px 12px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; font-family:var(--serif); font-weight:600; font-size:14px}
-  .dayHead .date{font-family:'Segoe UI','Malgun Gothic',sans-serif; color:var(--sub); font-weight:400; font-size:12px; margin-left:5px}
-  .dayHead .todayTag{font-family:'Segoe UI','Malgun Gothic',sans-serif; font-size:10px; font-weight:700; letter-spacing:0.04em; background:rgba(255,255,255,.22); padding:2px 7px; border-radius:99px}
+  .dayHead .date{font-family:var(--mono); color:var(--sub); font-weight:400; font-size:11px; margin-left:5px}
+  .dayHead .todayTag{font-family:'Inter','Malgun Gothic',sans-serif; font-size:10px; font-weight:700; letter-spacing:0.04em; background:rgba(255,255,255,.22); padding:2px 7px; border-radius:99px}
   .dayHead .hd-right{display:flex; align-items:center; gap:8px}
   .dayHead .chev{display:none; font-size:11px; opacity:.75}
   .day.today .dayHead{background:var(--accent); color:#fff; border-bottom-color:var(--accent)}
@@ -136,11 +140,11 @@
   .scCell:hover{background:var(--paper)}
   .scCell.other{background:#fbfafb}
   .scCell.other .scNum{color:#c7ccd6}
-  .scNum{font-size:12px; font-weight:600; margin-bottom:5px; line-height:22px}
+  .scNum{font-family:var(--mono); font-size:12px; font-weight:500; margin-bottom:5px; line-height:22px}
   .scCell.today .scNum{background:var(--accent); color:#fff; border-radius:99px; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center}
   .scChip{font-size:11px; background:var(--accent-wash); color:var(--accent-ink); border-radius:4px; padding:2px 6px; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .scChip b{font-variant-numeric:tabular-nums; font-weight:700}
-  .scChip:hover{background:#f6dfe9}
+  .scChip:hover{background:#DDE1F7}
   .scMore{font-size:10px; color:var(--sub); padding-left:2px}
 
   /* 할 일 = 카드가 아니라 얇은 한 줄 목록 행 */
@@ -178,7 +182,7 @@
   .tlDay{margin-top:12px; border-top:1px solid var(--line-2); padding-top:10px}
   .tlCount{font-size:11px; color:var(--sub); min-height:15px; margin-bottom:5px; font-weight:500}
   .tlRow{display:flex; gap:6px}
-  .tlHours{display:flex; flex-direction:column; justify-content:space-between; font-size:9px; color:var(--sub); text-align:right; height:150px}
+  .tlHours{display:flex; flex-direction:column; justify-content:space-between; font-family:var(--mono); font-size:9px; color:var(--sub); text-align:right; height:150px}
   .track{position:relative; flex:1; height:150px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r3); overflow:hidden}
   .htick{position:absolute; left:0; right:0; height:1px; background:var(--line)}
   .hseg{position:absolute; left:0; right:0; border-radius:2px; border:1px solid var(--card)}
