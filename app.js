@@ -419,6 +419,21 @@ document.getElementById('pomoStart').onclick = () => {
 };
 // 화면 복귀 시 실시간으로 맞춤(모바일에서 백그라운드 중 멈춘 것 보정)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && pomo.timer) pomoTick(); });
+// 건너뛰기: 현재 단계(집중/휴식)를 끝내고 다음 단계로. 실행 중이었다면 이어서 실행.
+// 집중을 건너뛰면 완료로 치지 않되(pomoDone·🍅 없음) 지금까지 집중한 구간은 타임라인에 기록.
+document.getElementById('pomoSkip').onclick = () => {
+  const wasRunning = !!pomo.timer;
+  clearInterval(pomo.timer); pomo.timer = null;
+  if (pomo.mode === 'work') commitSegment();
+  pomo.mode = pomo.mode === 'work' ? 'break' : 'work';
+  pomo.left = pomo.mode === 'work' ? workSec() : breakSec();
+  if (wasRunning) {
+    if (pomo.mode === 'work') pomo.segStart = Date.now();
+    pomo.endAt = Date.now() + pomo.left * 1000;
+    pomo.timer = setInterval(pomoTick, 1000);
+  }
+  pomoRender();
+};
 document.getElementById('pomoReset').onclick = () => {
   commitSegment();                   // 리셋 → 그때까지 기록
   clearInterval(pomo.timer); pomo.timer = null;
