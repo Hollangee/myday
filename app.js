@@ -51,7 +51,8 @@ function rolloverTasks(tasks, t) {
   for (const task of [...tasks]) {
     if (task.date < t && !task.carried && CARRY.includes(task.status)) {
       task.carried = true;
-      tasks.push({ id: uid(), title: task.title, date: t, status: 'todo', order: nextOrder(tasks, t), pomos: 0 });
+      // 포모도로를 진행했어도 못 끝냈으면 '딜레이'로 이월 + 🍅 진행 기록 유지
+      tasks.push({ id: uid(), title: task.title, date: t, status: 'delayed', order: nextOrder(tasks, t), pomos: task.pomos || 0 });
       changed = true;
     }
   }
@@ -685,8 +686,8 @@ function runSelfTest() {
   console.assert(tasks.find(x => x.id === 'd').carried === true, '딜레이도 이월');
   console.assert(!tasks.find(x => x.id === 'b').carried, '완료는 이월 안 함');
   console.assert(!tasks.find(x => x.id === 'e').carried, '안 함은 이월 안 함');
-  const copies = tasks.filter(x => x.date === t && x.status === 'todo');
-  console.assert(copies.length === 3 && copies.every(x => !x.carried), '미완료 3건이 오늘 todo로 복사');
+  const copies = tasks.filter(x => x.date === t && x.status === 'delayed');
+  console.assert(copies.length === 3 && copies.every(x => !x.carried), '미완료 3건이 오늘 딜레이로 복사');
   console.assert(rolloverTasks(tasks, t) === false, '두 번째 실행은 변경이 없어야 함');
   console.assert(nextOrder(tasks, t) === 3, 'nextOrder는 max+1');
   console.log('✅ self test 통과');
