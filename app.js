@@ -338,7 +338,16 @@ function renderCal() {
   const first = new Date(calBase);
   const start = monday(first);
   const t = today();
-  const dates = new Set(state.tasks.map(x => x.date));
+  // 날짜별 할 일 상태 목록 → 상태색 점 하나씩 (5개 초과는 4개 + ⋯)
+  const STATUS_COLOR = { todo: 'var(--accent)', doing: 'var(--doing)', done: 'var(--done)', delayed: 'var(--delay)', skipped: 'var(--skip)' };
+  const byDate = {};
+  for (const x of state.tasks) (byDate[x.date] = byDate[x.date] || []).push(STATUS_COLOR[x.status] || 'var(--accent)');
+  const dotsHtml = ds => {
+    const cs = byDate[ds];
+    if (!cs) return '';
+    const shown = cs.length > 5 ? cs.slice(0, 4) : cs;
+    return `<span class="dots">${shown.map(c => `<i style="background:${c}"></i>`).join('')}${cs.length > 5 ? '<b>⋯</b>' : ''}</span>`;
+  };
   let html = '<table><tr>' + DAYS.map(d => `<th>${d}</th>`).join('') + '</tr>';
   for (let w = 0; w < 6; w++) {
     html += '<tr>';
@@ -346,7 +355,7 @@ function renderCal() {
       const d = addDays(start, w * 7 + i);
       const ds = ymd(d);
       const cls = [d.getMonth() !== calBase.getMonth() ? 'other' : '', ds === t ? 'today' : ''].join(' ');
-      html += `<td class="${cls}" data-date="${ds}">${d.getDate()}${dates.has(ds) ? '<span class="dot"></span>' : ''}</td>`;
+      html += `<td class="${cls}" data-date="${ds}">${d.getDate()}${dotsHtml(ds)}</td>`;
     }
     html += '</tr>';
   }

@@ -94,7 +94,11 @@
   #cal td:hover{background:var(--paper)}
   #cal td.other{color:#c2c9d4}
   #cal td.today{background:var(--accent); color:#fff; font-weight:700}
-  #cal td .dot{position:absolute; bottom:2px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--delay)}
+  #cal td{padding-bottom:10px}
+  #cal td .dots{position:absolute; bottom:3px; left:50%; transform:translateX(-50%); display:flex; gap:2px; align-items:center}
+  #cal td .dots i{width:4px; height:4px; border-radius:50%; display:block}
+  #cal td .dots b{font-size:7px; color:var(--sub); line-height:1}
+  #cal td.today .dots i{outline:1px solid rgba(255,255,255,.9)}  /* 오늘(파란 칠) 위에서도 보이게 */
   .calHead{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
   .calHead button{border:none; background:none; font-size:13px; padding:2px 8px; color:var(--sub)}
   .calHead button:hover{color:var(--accent)}
